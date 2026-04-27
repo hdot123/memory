@@ -382,3 +382,71 @@ source_dir: /Users/busiji/memory/workspace/tools
 - CLI 入参通过 argparse required + choices 完整校验
 - Error logging 有双层回退机制
 - CoreConfig `__post_init__` 对 37 个字段做类型校验
+
+---
+
+## 补充：R6 (entry-service-boundary) 迟到报告
+
+R6 报告因限流延迟到达，以下发现为新增或交叉验证：
+
+### 新增 P2
+
+#### P2-16: `write_artifacts()` 仅捕获 RuntimeError，漏捕获 OSError/KeyError
+
+- **file**: `/Users/busiji/memory/workspace/tools/memory_hook_gateway.py`
+- **line**: 904-927
+- **type**: 异常传播缺陷
+- **trigger**: `ArtifactSinkImpl.write()` 内部 `package['host']` 抛 KeyError 或 `write_text()` 抛 OSError
+- **call_chain**: `write_artifacts()` → `_write_artifacts_via_sink()` → `ArtifactSinkImpl.write()` → KeyError/OSError 穿透
+- **expected**: 捕获 `Exception` 或 `(RuntimeError, OSError, KeyError)`
+- **actual**: 仅 `except RuntimeError`
+- **discovered_by**: R6
+
+#### P2-17: `append_error_log()` 同样仅捕获 RuntimeError
+
+- **file**: `/Users/busiji/memory/workspace/tools/memory_hook_gateway.py`
+- **line**: 893-901
+- **type**: 异常传播缺陷
+- **trigger**: `ErrorSinkImpl.log()` 内部 `mkdir`/`open` 抛 OSError
+- **discovered_by**: R6
+
+#### P2-18: `main()` 直接索引 package["status"] 和 package["missing_paths"]
+
+- **file**: `/Users/busiji/memory/workspace/tools/memory_hook_gateway.py`
+- **line**: 987, 994
+- **type**: 不安全键访问
+- **trigger**: `build_context_package` 返回不含这些键的 dict（shadow-run 或 external-core 异常）
+- **discovered_by**: R6
+
+### 新增 P3
+
+#### P3-07: `_resolve_callbacks()` interface 对象路径为死代码
+
+- **file**: `/Users/busiji/memory/workspace/tools/memory_hook_core.py`
+- **line**: 22-46
+- **type**: 死代码
+- **trigger**: `config.policy_registry` 始终为 None，interface 路径从未被激活
+- **discovered_by**: R6
+
+### R6 交叉验证 Non-Findings
+
+R6 确认了以下 entry↔service 边界的安全性（8 项 non-findings）：
+
+1. CoreConfig 字段与 `build_context_package()` kwargs 1:1 匹配 ✅
+2. `build_context_package_from_config → build_context_package_core` 33 个参数映射完整 ✅
+3. `GatewayBusinessPolicyConfig` 37 个字段与 gateway 传递值匹配 ✅
+4. `PolicyRegistryImpl` 实现 `PolicyRegistry` 全部 12 个抽象方法 ✅
+5. `RouteTargetPolicyImpl` / `WriteTargetPolicyImpl` 签名匹配 ✅
+6. `ArtifactSinkImpl` / `ErrorSinkImpl` 接口契约满足 ✅
+7. `CodexDelegate` / `ClaudeDelegate` 方法名、参数、返回类型匹配 ✅
+8. Context package DTO 17 个顶层键对消费者完整 ✅
+
+### 更新后统计
+
+| Severity | 原始 | 补充 | 总计 |
+|----------|------|------|------|
+| P0 | 3 | 0 | **3** |
+| P1 | 9 | 0 | **9** |
+| P2 | 15 | +3 | **18** |
+| P3 | 6 | +1 | **7** |
+| **Total** | **33** | **+4** | **37** |
