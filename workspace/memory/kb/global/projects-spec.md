@@ -36,8 +36,8 @@ Step 1: 读取看板
     │  gh project item-list <number> --owner hdot123
     │
 Step 2: 检查本地文件
-    │  ls /Users/busiji/tool/<任务>-PLAN.md
-    │  ls /Users/busiji/tool/<任务>-STATE.md
+    │  ls <project-root>/<任务>-PLAN.md
+    │  ls <project-root>/<任务>-STATE.md
     │
 Step 3: 判断状态
     │
@@ -59,9 +59,9 @@ Step 3: 判断状态
 
 ```bash
 # 仓库定位（从看板 readme 或卡片中提取）
-# 假设仓库路径为 /Users/busiji/tool/<repo>
+# 假设仓库路径为 <project-root>/<repo>
 
-cd /Users/busiji/tool/<repo>
+cd <project-root>/<repo>
 
 # 分支状态
 git branch -a
@@ -279,9 +279,9 @@ Cherry-pick / 改动列表（按顺序）：
 
 | 文件 | 命名 | 位置 |
 |------|------|------|
-| 计划文件 | `<任务名>-PLAN.md` | `/Users/busiji/tool/` |
-| 状态文件 | `<任务名>-STATE.md` | `/Users/busiji/tool/` |
-| 规范文件 | `PROJECTS-SPEC.md` | `/Users/busiji/tool/`（本文件） |
+| 计划文件 | `<任务名>-PLAN.md` | `<project-root>/` |
+| 状态文件 | `<任务名>-STATE.md` | `<project-root>/` |
+| 规范文件 | `PROJECTS-SPEC.md` | `<project-root>/`（本文件） |
 
 任务名从看板标题中提取，大写英文+连字符。示例：
 - `AxonHub Rebase` → `REBASE`
@@ -639,7 +639,7 @@ CE-01 在以下环节自动参与：
 
 ```bash
 # 将本地 branch-2 推送到 origin
-cd /Users/busiji/tool/axonhub
+cd <project-root>/axonhub
 git push origin branch-2
 
 # 在 CE-01 上拉取最新代码
