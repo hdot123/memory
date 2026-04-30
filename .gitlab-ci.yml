@@ -12,8 +12,11 @@ cache:
 test:
   stage: test
   before_script:
+    - python3 -m venv /tmp/ci-venv
+    - source /tmp/ci-venv/bin/activate
     - pip install --upgrade pip pytest ruff
   script:
+    - source /tmp/ci-venv/bin/activate
     - ruff check .
     - python -m pytest -q tests
   rules:
