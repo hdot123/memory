@@ -17,8 +17,9 @@ test:
     - pip install --upgrade pip pytest ruff
   script:
     - source /tmp/ci-venv/bin/activate
-    - PYTHONPATH=. ruff check .
-    - PYTHONPATH=. python -m pytest -q tests
+    - ln -sfn memory_core workspace
+    - ruff check .
+    - python -m pytest -q tests
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
 
