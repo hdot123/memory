@@ -720,7 +720,7 @@ ssh ce-01 'cd /root/axonhub-ci && \
     -p 8090:8090 \
     -v /root/axonhub-ci/config.yml:/app/config.yml:ro \
     -e AXONHUB_DB_DIALECT=postgres \
-    -e "AXONHUB_DB_DSN=postgres://axonhub:axonhub_password@postgres:5432/axonhub?sslmode=disable" \
+    -e "AXONHUB_DB_DSN=postgres://user:password@localhost:5432/axonhub?sslmode=disable" \
     --restart unless-stopped \
     axonhub-hdot:v0.9.37-latest'
 ```
