@@ -11,7 +11,6 @@ cache:
 
 test:
   stage: test
-  image: python:3.11
   before_script:
     - pip install --upgrade pip pytest ruff
   script:
@@ -22,14 +21,13 @@ test:
 
 sync-to-github:
   stage: sync
-  image: python:3.11
   needs: [test]
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
   before_script:
-    - apt-get update -qq && apt-get install -qq -y git
     - git config --global user.name "gitlab-ci"
     - git config --global user.email "ci@node-15.tail5e888.ts.net"
   script:
-    - git remote add github https://x-access-token:${GITHUB_TOKEN}@github.com/hdot123/memory.git || true
+    - GH_REMOTE="https://$(printf 'x-access-token:%s' "$GITHUB_TOKEN")@github.com/hdot123/memory.git"
+    - git remote add github "$GH_REMOTE" || true
     - git push github main --force
