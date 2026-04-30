@@ -14,10 +14,10 @@ test:
   before_script:
     - python3 -m venv /tmp/ci-venv
     - source /tmp/ci-venv/bin/activate
-    - pip install --upgrade pip pytest ruff
+    - pip install --upgrade pip ruff
+    - pip install -e ".[dev]"
   script:
     - source /tmp/ci-venv/bin/activate
-    - ln -sfn memory_core workspace
     - ruff check .
     - python -m pytest -q tests
   rules:
