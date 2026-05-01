@@ -11,17 +11,14 @@ cache:
 
 test:
   stage: test
-  variables:
-    PYTHONPATH: "."
   before_script:
     - python3 -m venv /tmp/ci-venv
     - source /tmp/ci-venv/bin/activate
     - pip install --upgrade pip pytest ruff
+    - apt-get install -y -qq ripgrep 2>/dev/null || true
   script:
     - source /tmp/ci-venv/bin/activate
-    - export PYTHONPATH=.
-    - pip install -e .
-    - apt-get install -y -qq ripgrep 2>/dev/null || true
+    - rm -rf workspace/tools && ln -s ../memory_core/tools workspace/tools
     - ruff check .
     - python -m pytest -q tests
   rules:
