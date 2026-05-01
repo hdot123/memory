@@ -19,7 +19,9 @@ test:
     - pip install --upgrade pip pytest ruff
   script:
     - source /tmp/ci-venv/bin/activate
-    - rm -rf workspace && ln -s memory_core workspace
+    - export PYTHONPATH=.
+    - pip install -e .
+    - apt-get install -y -qq ripgrep 2>/dev/null || true
     - ruff check .
     - python -m pytest -q tests
   rules:
