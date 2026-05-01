@@ -15,7 +15,7 @@ test:
     - python3 -m venv /tmp/ci-venv
     - source /tmp/ci-venv/bin/activate
     - pip install --upgrade pip pytest ruff
-    - apt-get install -y -qq ripgrep 2>/dev/null || true
+    - apt-get install -y -qq ripgrep 2>/dev/null || curl -sSfL https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz | tar xz --strip-components=1 -C /usr/local/bin ripgrep-14.1.1-x86_64-unknown-linux-musl/rg
   script:
     - source /tmp/ci-venv/bin/activate
     - rm -rf workspace/tools && ln -s ../memory_core/tools workspace/tools
