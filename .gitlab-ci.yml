@@ -33,6 +33,6 @@ sync-to-github:
     - git config --global user.email "ci@node-15.tail5e888.ts.net"
   script:
     - git checkout -B main HEAD
-    - GH_REMOTE="https://$(printf 'x-access-token:%s' "$GITHUB_TOKEN")@github.com/hdot123/memory.git"
-    - git remote add github "$GH_REMOTE" || true
+    - git remote remove github 2>/dev/null || true
+    - git remote add github "https://x-access-token:${GITHUB_TOKEN}@github.com/hdot123/memory.git"
     - git push github main --force
