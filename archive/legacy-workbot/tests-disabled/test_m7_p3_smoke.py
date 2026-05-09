@@ -6,6 +6,7 @@ that core workspace INDEX files exist and contain no absolute-path leaks.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +14,14 @@ from pathlib import Path
 # Import hook – make memory_core/tools importable
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "memory_core" / "tools"))
+
+# Ensure workbot adapter is loaded for this test file (tests are workbot-scoped).
+os.environ["MEMORY_HOOK_ADAPTER"] = "workbot"
+
+# Force reload if already imported by another test with a different adapter
+for _name in list(sys.modules.keys()):
+    if _name.startswith("memory_hook") or _name.startswith("memory_core.tools.memory_hook"):
+        del sys.modules[_name]
 
 from memory_hook_gateway import build_context_package  # noqa: E402
 
