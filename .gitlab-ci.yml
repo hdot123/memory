@@ -18,6 +18,7 @@ test:
   script:
     - source /tmp/ci-venv/bin/activate
     - ruff check .
+    - python scripts/check_boundary.py
     - python -m pytest -q tests
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
