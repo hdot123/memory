@@ -1,5 +1,6 @@
 stages:
   - test
+  - health_check
   - sync
 
 variables:
@@ -20,6 +21,18 @@ test:
     - ruff check .
     - python scripts/check_boundary.py
     - python -m pytest -q tests
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+
+health-check:
+  stage: health_check
+  before_script:
+    - python3 -m venv /tmp/ci-health-venv
+    - source /tmp/ci-health-venv/bin/activate
+    - pip install --upgrade pip pytest ruff
+  script:
+    - source /tmp/ci-health-venv/bin/activate
+    - bash scripts/ci_health_check.sh
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
 

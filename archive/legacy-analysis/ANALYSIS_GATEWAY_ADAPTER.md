@@ -1,3 +1,5 @@
+> [ARCHIVED 2026-05-10] 此文档分析已弃用的 workbot adapter 机制，仅保留作为历史参考。
+
 # Gateway 门面与 Adapter 适配器机制分析报告
 
 ## 一、Gateway 作为门面：函数功能分组
