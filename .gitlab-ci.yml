@@ -36,9 +36,12 @@ health-check:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
 
+# ⚠️ GitHub is a mirror — all development happens on GitLab.
+# Only sync after ALL stages pass (test + health_check).
+# Never push directly to GitHub from any machine; only GitLab CI can push.
 sync-to-github:
   stage: sync
-  needs: [test]
+  needs: [test, health-check]
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
   before_script:
