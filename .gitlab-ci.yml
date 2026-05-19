@@ -45,10 +45,11 @@ sync-to-github:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
   before_script:
-    - git config --global user.name "gitlab-ci"
-    - git config --global user.email "ci@node-15.tail5e888.ts.net"
+    - git config --global user.name "ci-sync"
+    - git config --global user.email "ci-sync@node-15.tail5e888.ts.net"
   script:
     - git checkout -B main HEAD
     - git remote remove github 2>/dev/null || true
-    - git remote add github "https://x-access-token:${GITHUB_TOKEN}@github.com/hdot123/memory.git"
+    - git remote add github "*************************************************/hdot123/memory.git"
+    - git commit --amend --reset-author --no-edit
     - git push github main --force
