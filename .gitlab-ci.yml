@@ -22,7 +22,7 @@ test:
     - python scripts/check_boundary.py
     - python -m pytest -q tests
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: $CI_PIPELINE_SOURCE == "push"
 
 health-check:
   stage: health_check
@@ -34,22 +34,19 @@ health-check:
     - source /tmp/ci-health-venv/bin/activate
     - bash scripts/ci_health_check.sh
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: $CI_PIPELINE_SOURCE == "push"
 
-# ⚠️ GitHub is a mirror — all development happens on GitLab.
-# Only sync after ALL stages pass (test + health_check).
-# Never push directly to GitHub from any machine; only GitLab CI can push.
 sync-to-github:
   stage: sync
   needs: [test, health-check]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
   before_script:
     - git config --global user.name "ci-sync"
     - git config --global user.email "ci-sync@node-15.tail5e888.ts.net"
   script:
     - git checkout -B main HEAD
     - git remote remove github 2>/dev/null || true
-    - git remote add github "*************************************************/hdot123/memory.git"
+    - git remote add github "https://x-access-token:${GITHUB_TOKEN}@github.com/hdot123/memory.git"
     - git commit --amend --reset-author --no-edit
     - git push github main --force
