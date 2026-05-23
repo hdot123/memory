@@ -15,7 +15,9 @@ test:
   before_script:
     - python3 -m venv /tmp/ci-venv
     - source /tmp/ci-venv/bin/activate
-    - pip install --upgrade pip pytest ruff
+    - pip install --upgrade pip
+    - pip install -e ".[dev]"
+    - pip install ruff
   script:
     - source /tmp/ci-venv/bin/activate
     - ruff check .
@@ -29,7 +31,9 @@ health-check:
   before_script:
     - python3 -m venv /tmp/ci-health-venv
     - source /tmp/ci-health-venv/bin/activate
-    - pip install --upgrade pip pytest ruff
+    - pip install --upgrade pip
+    - pip install -e ".[dev]"
+    - pip install ruff
   script:
     - source /tmp/ci-health-venv/bin/activate
     - bash scripts/ci_health_check.sh
