@@ -1,3 +1,7 @@
+include:
+  - project: 'infra/ci-templates'
+    file: 'scope-check.yml'
+
 stages:
   - test
   - health_check
