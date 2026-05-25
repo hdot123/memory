@@ -1,0 +1,116 @@
+include:
+  - project: 'infra/ci-templates'
+    file: 'scope-check.yml'
+
+stages:
+  - test
+  - health_check
+  - sync
+  - release
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+
+cache:
+  paths:
+    - .pip-cache/
+
+test:
+  stage: test
+  before_script:
+    - python3 -m venv /tmp/ci-venv
+    - source /tmp/ci-venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -e ".[dev]"
+    - pip install ruff
+  script:
+    - source /tmp/ci-venv/bin/activate
+    - ruff check .
+    - python scripts/check_boundary.py
+    - python -m pytest -q tests
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+
+health-check:
+  stage: health_check
+  before_script:
+    - python3 -m venv /tmp/ci-health-venv
+    - source /tmp/ci-health-venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -e ".[dev]"
+    - pip install ruff
+  script:
+    - source /tmp/ci-health-venv/bin/activate
+    - bash scripts/ci_health_check.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+
+sync-to-github:
+  stage: sync
+  needs: [test, health-check]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
+  before_script:
+    - git config --global user.name "ci-sync"
+    - git config --global user.email "ci-sync@node-15.tail5e888.ts.net"
+  script:
+    - git checkout -B main HEAD
+    - git remote remove github 2>/dev/null || true
+    - git remote add github "https://hdot123:${GITHUB_TOKEN}@github.com/hdot123/memory.git"
+    - git commit --amend --reset-author --no-edit --allow-empty
+    - git push github main --force
+
+sync-tags-to-github:
+  stage: sync
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  rules:
+    - if: $CI_COMMIT_TAG
+  before_script:
+    - git config --global user.name "ci-sync"
+    - git config --global user.email "ci-sync@node-15.tail5e888.ts.net"
+  script:
+    - git remote remove github 2>/dev/null || true
+    - git remote add github "https://hdot123:${GITHUB_TOKEN}@github.com/hdot123/memory.git"
+    - git push github $CI_COMMIT_TAG
+
+create-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Creating GitLab release for $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "memory-core $CI_COMMIT_TAG"
+    description: "./CHANGELOG.md"
+
+github-release:
+  stage: release
+  needs: [sync-tags-to-github]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  rules:
+    - if: $CI_COMMIT_TAG
+  before_script:
+    - apk add --no-cache github-cli
+  script:
+    - VERSION="${CI_COMMIT_TAG#v}"
+    - NOTES=$(sed -n "/## \\[${VERSION}\\]/,/## \\[/p" CHANGELOG.md | head -n -1)
+    - if [ -z "$NOTES" ]; then NOTES="See CHANGELOG.md for details."; fi
+    - echo "$NOTES" > /tmp/release_notes.md
+    - gh release create $CI_COMMIT_TAG --title "memory-core $CI_COMMIT_TAG" --notes-file /tmp/release_notes.md --repo hdot123/memory
+  variables:
+    GH_TOKEN: "$GITHUB_TOKEN"
