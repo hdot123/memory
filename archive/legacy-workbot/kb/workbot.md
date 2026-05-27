@@ -73,10 +73,10 @@ related: [workbot-memory-system, workbot-truth-model, workbot-hook-contract]
 
 ### Source Refs
 - `memory_core/INDEX.md`
-- `memory_core/memory/docs/INDEX.md`
-- `memory_core/memory/kb/global/workbot-truth-model.md`
-- `memory_core/memory/kb/global/workbot-hook-contract.md`
-- `memory_core/memory/kb/global/workbot-memory-system.md`
+- `memory/docs/INDEX.md`
+- `memory/kb/global/workbot-truth-model.md`
+- `memory/kb/global/workbot-hook-contract.md`
+- `memory/kb/global/workbot-memory-system.md`
 
 ### Authority Refs
 - `memory_core/project-map/legal-core-map.md`

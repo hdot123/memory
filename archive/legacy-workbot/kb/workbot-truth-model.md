@@ -116,7 +116,7 @@ related: [workbot-memory-system, workbot-memory-routing, workbot-hook-contract, 
 
 ### Global Canonical
 
-进入 `memory_core/memory/kb/global/` 的内容必须：
+进入 `memory/kb/global/` 的内容必须：
 
 - 有来源材料或既有控制面来源
 - 受总系统或更上位治理边界约束
@@ -125,7 +125,7 @@ related: [workbot-memory-system, workbot-memory-routing, workbot-hook-contract, 
 
 ### Project Canonical
 
-进入 `memory_core/memory/kb/projects/` 的内容必须：
+进入 `memory/kb/projects/` 的内容必须：
 
 - 有项目来源材料
 - 受 global canonical 约束
@@ -175,7 +175,7 @@ related: [workbot-memory-system, workbot-memory-routing, workbot-hook-contract, 
 
 ### Source Refs
 - `memory_core/INDEX.md`
-- `memory_core/memory/kb/global/workbot-memory-system.md`
+- `memory/kb/global/workbot-memory-system.md`
 
 ### Authority Refs
 - `memory_core/project-map/legal-core-map.md`
