@@ -1,6 +1,8 @@
 include:
   - project: 'infra/ci-templates'
     file: 'scope-check.yml'
+  - project: 'infra/ci-templates'
+    file: 'github-sync.yml'
 
 stages:
   - test
@@ -44,42 +46,6 @@ health-check:
     - bash scripts/ci_health_check.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
-
-sync-to-github:
-  stage: sync
-  needs: [test, health-check]
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
-  before_script:
-    - git config --global user.name "ci-sync"
-    - git config --global user.email "ci-sync@node-15.tail5e888.ts.net"
-  script:
-    - git checkout -B main HEAD
-    - git remote remove github 2>/dev/null || true
-    - git remote add github "******************************************/hdot123/memory.git"
-    - git push github main --force
-
-sync-tags-to-github:
-  stage: sync
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
-  rules:
-    - if: $CI_COMMIT_TAG
-  before_script:
-    - git config --global user.name "ci-sync"
-    - git config --global user.email "ci-sync@node-15.tail5e888.ts.net"
-  script:
-    - git remote remove github 2>/dev/null || true
-    - git remote add github "https://hdot123:${GITHUB_TOKEN}@github.com/hdot123/memory.git"
-    - git push github $CI_COMMIT_TAG
 
 create-release:
   stage: release
