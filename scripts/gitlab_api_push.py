@@ -111,7 +111,7 @@ def with_admin_fallback(func):
         if "404 Project Not Found" in str(e) or "403" in str(e):
             admin_token = discover_admin_token_from_remote()
             if admin_token:
-                print(f"Primary token lacks access, falling back to admin token from git remote...")
+                print("Primary token lacks access, falling back to admin token from git remote...")
                 with AdminTokenContext():
                     return func()
         raise
