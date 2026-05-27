@@ -63,13 +63,13 @@ class TestM7P3Smoke:
         )
 
     def test_docs_index_exists(self) -> None:
-        assert (REPO_ROOT / "memory_core" / "memory" / "docs" / "INDEX.md").is_file(), (
-            "memory_core/memory/docs/INDEX.md is missing"
+        assert (REPO_ROOT / "memory" / "docs" / "INDEX.md").is_file(), (
+            "memory/docs/INDEX.md is missing"
         )
 
     def test_global_index_exists(self) -> None:
-        assert (REPO_ROOT / "memory_core" / "memory" / "kb" / "global" / "INDEX.md").is_file(), (
-            "memory_core/memory/kb/global/INDEX.md is missing"
+        assert (REPO_ROOT / "memory" / "kb" / "global" / "INDEX.md").is_file(), (
+            "memory/kb/global/INDEX.md is missing"
         )
 
     # -- absolute-path leak check ---------------------------------------------

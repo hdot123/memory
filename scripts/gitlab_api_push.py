@@ -11,8 +11,8 @@ Usage::
       --project "infra/memory-core" \
       --branch "fix/my-feature" \
       --message "docs: update INDEX.md" \
-      --file memory_core/memory/docs/INDEX.md \
-      --file memory_core/memory/docs/design/INDEX.md
+      --file memory/docs/INDEX.md \
+      --file memory/docs/design/INDEX.md
 
     # Create MR
     python scripts/gitlab_api_push.py \

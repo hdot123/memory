@@ -178,11 +178,11 @@ raise ValueError(
 
 ### Source Refs
 - `memory_core/INDEX.md`
-- `memory_core/memory/kb/global/workbot-hook-contract.md`
+- `memory/kb/global/workbot-hook-contract.md`
 
 ### Authority Refs
-- `memory_core/memory/kb/global/workbot-truth-model.md`
-- `memory_core/memory/kb/global/workbot-memory-system.md`
+- `memory/kb/global/workbot-truth-model.md`
+- `memory/kb/global/workbot-memory-system.md`
 
 ### Evidence Refs
 - `memory_core/tools/memory_hook_interfaces.py`
