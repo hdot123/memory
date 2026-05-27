@@ -1,0 +1,13 @@
+title = "gitleaks config"
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(?:api[_-]?key|apikey|token|secret|password)\s*[=:]\s*['"][A-Za-z0-9+/=_-]{16,}['"]'''
+tags = ["key", "secret"]
+
+[allowlist]
+paths = [
+  '''conftest\.py$''',
+  '''tests/.*''',
+]
