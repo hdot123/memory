@@ -268,38 +268,61 @@ def is_file_on_branch(project_id: int, branch: str, file_path: str) -> bool:
         return False
 
 
-def push_files(
+def push_changes(
     project_id: int,
     branch: str,
     commit_message: str,
-    files: list[str],
+    files: Optional[list[str]] = None,
+    deletes: Optional[list[str]] = None,
     auto_branch: bool = False,
 ) -> dict:
-    """Push multiple files to a branch via Commits API."""
-    actions = []
+    """Push file creates/updates and deletions to a branch via Commits API.
 
-    for file_path in files:
-        path = Path(file_path)
-        if not path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-
-        content, encoding = read_file_content(file_path)
-        # Check if file already exists on the remote branch
-        action_type = "update" if is_file_on_branch(project_id, branch, file_path) else "create"
-        action = {
-            "action": action_type,
-            "file_path": str(path),
-            "content": content,
-        }
-        if encoding == "base64":
-            action["encoding"] = "base64"
-
-        actions.append(action)
+    All changes are committed atomically in a single commit.
+    """
+    if not files and not deletes:
+        raise ValueError("At least one --file or --delete must be specified.")
 
     # Check if branch exists, create if needed
     if auto_branch and not check_branch_exists(project_id, branch):
         print(f"Branch '{branch}' doesn't exist, creating from main...")
         create_branch(project_id, branch)
+
+    actions: list[dict[str, Any]] = []
+
+    # Handle create / update actions
+    if files:
+        for file_path in files:
+            path = Path(file_path)
+            if not path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            content, encoding = read_file_content(file_path)
+            # Check if file already exists on the remote branch (after branch creation)
+            action_type = "update" if is_file_on_branch(project_id, branch, file_path) else "create"
+            action: dict[str, Any] = {
+                "action": action_type,
+                "file_path": str(path),
+                "content": content,
+            }
+            if encoding == "base64":
+                action["encoding"] = "base64"
+
+            actions.append(action)
+
+    # Handle delete actions
+    if deletes:
+        for file_path in deletes:
+            if is_file_on_branch(project_id, branch, file_path):
+                actions.append({
+                    "action": "delete",
+                    "file_path": file_path,
+                })
+            else:
+                print(f"Warning: '{file_path}' not found on remote branch, skipping delete.")
+
+    if not actions:
+        raise RuntimeError("No actions to commit (all files may already be absent).")
 
     payload = {
         "branch": branch,
@@ -384,6 +407,13 @@ def main():
         help="File to push (can be specified multiple times).",
     )
     parser.add_argument(
+        "--delete", "-d",
+        type=str,
+        action="append",
+        required=False,
+        help="File to delete (can be specified multiple times).",
+    )
+    parser.add_argument(
         "--auto-branch",
         action="store_true",
         help="Create branch automatically if it doesn't exist.",
@@ -439,16 +469,27 @@ def main():
     project_id = resolve_project_id(project)
     print(f"Project ID: {project_id}")
 
-    # Push files if specified
-    if args.file:
-        commit_msg = args.message or f"Update {len(args.file)} file(s)"
-        print(f"Pushing {len(args.file)} file(s) to branch '{args.branch}'...")
+    # Push changes if files or deletes specified
+    if args.file or args.delete:
+        parts = []
+        if args.file:
+            parts.append(f"更新 {len(args.file)} 个文件")
+        if args.delete:
+            parts.append(f"删除 {len(args.delete)} 个文件")
+        commit_msg = args.message or "、".join(parts)
+        action_summary = []
+        if args.file:
+            action_summary.append(f"{len(args.file)} file(s)")
+        if args.delete:
+            action_summary.append(f"{len(args.delete)} deletion(s)")
+        print(f"Pushing {' + '.join(action_summary)} to branch '{args.branch}'...")
 
-        result = push_files(
+        result = push_changes(
             project_id=project_id,
             branch=args.branch,
             commit_message=commit_msg,
             files=args.file,
+            deletes=args.delete,
             auto_branch=args.auto_branch,
         )
 
