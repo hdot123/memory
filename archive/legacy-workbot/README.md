@@ -12,8 +12,8 @@
 
 | 文件 | 原路径 | 性质 |
 |---|---|---|
-| `workbot.md` | `memory_core/memory/kb/projects/workbot.md` | workbot 项目真相 |
-| `workbot-truth-model.md` | `memory_core/memory/kb/global/workbot-truth-model.md` | workbot 真相模型 |
+| `workbot.md` | `memory/kb/projects/workbot.md` | workbot 项目真相 |
+| `workbot-truth-model.md` | `memory/kb/global/workbot-truth-model.md` | workbot 真相模型 |
 | `workbot-memory-system.md` | 同前缀 | workbot 记忆系统说明 |
 | `workbot-hook-contract.md` | 同前缀 | workbot hook 合约 |
 | `workbot-project-map-governance.md` | 同前缀 | workbot 地图治理 |
@@ -38,7 +38,7 @@
 
 ### projects-spec-axonhub-section.md — AxonHub 部署运维段
 
-`memory_core/memory/kb/global/projects-spec.md` 第 11 节"CE-01 自动化部署"被剥离至此（含 SSH 别名、IP 地址、Docker 服务名、镜像版本号等业务专属运维信息）。
+`memory/kb/global/projects-spec.md` 第 11 节"CE-01 自动化部署"被剥离至此（含 SSH 别名、IP 地址、Docker 服务名、镜像版本号等业务专属运维信息）。
 
 ## 恢复方法
 
@@ -46,14 +46,14 @@
 
 ```bash
 # 1. 恢复 8 个 kb 文件到原位置
-mv archive/legacy-workbot/kb/workbot.md memory_core/memory/kb/projects/workbot.md
-mv archive/legacy-workbot/kb/workbot-*.md archive/legacy-workbot/kb/workbot-policy-pack.json memory_core/memory/kb/global/
+mv archive/legacy-workbot/kb/workbot.md memory/kb/projects/workbot.md
+mv archive/legacy-workbot/kb/workbot-*.md archive/legacy-workbot/kb/workbot-policy-pack.json memory/kb/global/
 
 # 2. 恢复 7 个测试文件
 mv archive/legacy-workbot/tests-disabled/*.py tests/
 
 # 3. 恢复 projects-spec.md 第 11 节
-cat archive/legacy-workbot/projects-spec-axonhub-section.md >> memory_core/memory/kb/global/projects-spec.md
+cat archive/legacy-workbot/projects-spec-axonhub-section.md >> memory/kb/global/projects-spec.md
 # 然后手工删除 projects-spec.md 末尾的剥离说明段
 
 # 4. 启用 workbot adapter
