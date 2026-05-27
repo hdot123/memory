@@ -61,8 +61,7 @@ sync-to-github:
   script:
     - git checkout -B main HEAD
     - git remote remove github 2>/dev/null || true
-    - git remote add github "https://hdot123:${GITHUB_TOKEN}@github.com/hdot123/memory.git"
-    - git commit --amend --reset-author --no-edit --allow-empty
+    - git remote add github "******************************************/hdot123/memory.git"
     - git push github main --force
 
 sync-tags-to-github:
