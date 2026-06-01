@@ -23,6 +23,7 @@ test:
   before_script:
     - python3 -m venv /tmp/ci-venv
     - source /tmp/ci-venv/bin/activate
+    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
     - pip install --upgrade pip
     # 先强制覆盖 runner 预装的问题包（无 RECORD 文件），不触发卸载只覆盖
     - pip install "pytest>=8.0,<9.0" "Pygments" "setuptools" --force-reinstall --no-deps
