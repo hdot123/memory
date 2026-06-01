@@ -16,12 +16,17 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
 
 cache:
+  key: v2-default-protected
   paths:
     - .pip-cache/
 
 test:
   stage: test
   before_script:
+    # 清理旧缓存，避免已删除模块冲突
+    - rm -rf .pip-cache/* 2>/dev/null || true
+    - find . -name "*.pyc" -delete 2>/dev/null || true
+    - find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
     # --break-system-packages 绕过 PEP 668，用户级别安装
     - python3 -m pip install --user --break-system-packages "pytest>=8.0,<9.0" "pytest-cov>=5.0"
     - export PATH="$HOME/.local/bin:$PATH"
