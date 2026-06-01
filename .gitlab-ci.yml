@@ -21,14 +21,11 @@ cache:
 test:
   stage: test
   before_script:
-    # 用 --system-site-packages 访问 runner 预装包
-    - python3 -m venv /tmp/ci-venv --system-site-packages
-    - source /tmp/ci-venv/bin/activate
-    # 只安装 memory-core 本身（无 RECORD 的预装包不受影响）
-    - pip install -e "." --no-deps
+    # 直接用 runner 预装的 pytest/ruff，不安装任何新包
+    - export PYTHONPATH="$CI_PROJECT_DIR:$PYTHONPATH"
+  script:
     - ruff check .
     - python scripts/check_boundary.py
-    # 直接用 pytest 命令，不经过 python -m pytest（绕过 __main__ 的 console_main bug）
     - pytest -q tests
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
