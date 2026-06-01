@@ -24,6 +24,8 @@ test:
     - python3 -m venv /tmp/ci-venv
     - source /tmp/ci-venv/bin/activate
     - pip install --upgrade pip
+    # 先强制安装兼容的 pytest，绕过 runner 预装 9.0.3 无法卸载的问题
+    - pip install "pytest>=8.0,<9.0" --force-reinstall
     - pip install -e ".[dev]"
     - pip install ruff
   script:
