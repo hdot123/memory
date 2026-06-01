@@ -44,6 +44,8 @@ test:
 health-check:
   stage: health_check
   before_script:
+    # 清理旧缓存和 .pyc 文件，避免已删除模块冲突
+    - rm -rf .pip-cache/* 2>/dev/null || true
     - find . -name "*.pyc" -delete 2>/dev/null || true
     - find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
     - python3 -m venv /tmp/ci-health-venv
