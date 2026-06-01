@@ -21,12 +21,15 @@ cache:
 test:
   stage: test
   before_script:
-    - pip install -e ".[dev]" --ignore-installed
-    - pip install ruff --ignore-installed
-  script:
-    - pytest -q tests
-    - python scripts/check_boundary.py
+    # 用 --system-site-packages 访问 runner 预装包
+    - python3 -m venv /tmp/ci-venv --system-site-packages
+    - source /tmp/ci-venv/bin/activate
+    # 只安装 memory-core 本身（无 RECORD 的预装包不受影响）
+    - pip install -e "." --no-deps
     - ruff check .
+    - python scripts/check_boundary.py
+    # 直接用 pytest 命令，不经过 python -m pytest（绕过 __main__ 的 console_main bug）
+    - pytest -q tests
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
 
