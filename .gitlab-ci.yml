@@ -78,6 +78,33 @@ github-release:
 
 droid-wiki-refresh:
   stage: wiki
+  script:
+    - |
+      curl -s http://localhost:5555/hooks/wiki-refresh \
+        -H "Content-Type: application/json" \
+        -d '{"ref":"main","project":"memory-core"}'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+test-failed:
+  stage: test
+  script:
+    - |
+      echo "Test failed, notifying Linear via Droid..."
+      curl -s "$WEBHOOK_URL/hooks/ci-failed" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "pipeline_id": "'$CI_PIPELINE_ID'",
+          "project": "'$CI_PROJECT_PATH'",
+          "branch": "'$CI_COMMIT_REF_NAME'",
+          "sha": "'$CI_COMMIT_SHA'",
+          "commit_message": "'$CI_COMMIT_MESSAGE'"
+        }'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+      when: on_failure
+  variables:
+    WEBHOOK_URL: "$MAC_WEBHOOK_URL"
   before_script:
     - curl -fsSL https://app.factory.ai/cli | sh
   script:
