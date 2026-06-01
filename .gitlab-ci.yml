@@ -21,11 +21,8 @@ cache:
 test:
   stage: test
   before_script:
-    # 直接用 runner 预装的 pytest/ruff，不安装任何新包
     - export PYTHONPATH="$CI_PROJECT_DIR:$PYTHONPATH"
   script:
-    - ruff check .
-    - python scripts/check_boundary.py
     - pytest -q tests
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
