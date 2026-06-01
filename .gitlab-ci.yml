@@ -30,6 +30,16 @@ test:
     - pytest -q tests
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - "*.py"
+        - "memory_core/**/*"
+        - "tests/**/*"
+        - "scripts/**/*"
+        - "pyproject.toml"
+        - "conftest.py"
+        - "MANIFEST.in"
+    - if: $CI_PIPELINE_SOURCE == "push"
+      when: never
 
 health-check:
   stage: health_check
