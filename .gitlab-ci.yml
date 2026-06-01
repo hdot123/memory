@@ -23,13 +23,17 @@ test:
   before_script:
     - python3 -m venv /tmp/ci-venv
     - source /tmp/ci-venv/bin/activate
-    - pip install --upgrade pip
-    # 先安装 setuptools（--ignore-installed 可能破坏它）
-    - pip install setuptools wheel
-    # 用 --ignore-installed 跳过卸载 runner 预装包（无 RECORD 文件无法卸载）
-    - pip install "pytest>=8.0,<9.0" "pytest-cov>=5.0" --no-deps --ignore-installed
-    - pip install -e ".[dev]"
-    - pip install ruff
+    # 手动逐个安装依赖，完全绕过 runner 预装包（无 RECORD 文件无法卸载）
+    # --ignore-installed 只安装，不尝试卸载
+    - pip install --upgrade pip --ignore-installed
+    - pip install "pytest>=8.0,<9.0" --no-deps --ignore-installed
+    - pip install "pytest-cov>=5.0" --no-deps --ignore-installed
+    - pip install "mypy>=1.10" --no-deps --ignore-installed
+    - pip install "requests>=2.28" --no-deps --ignore-installed
+    - pip install "coverage[toml]>=7.10.6" --no-deps --ignore-installed
+    - pip install "typing_extensions>=4.6.0" --no-deps --ignore-installed
+    - pip install ruff --no-deps --ignore-installed
+    - pip install -e "." --no-deps --no-build-isolation
   script:
     - source /tmp/ci-venv/bin/activate
     - ruff check .
