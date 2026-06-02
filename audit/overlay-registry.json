@@ -1,0 +1,91 @@
+{
+  "last_check": "2026-05-30T13:26:31.593116",
+  "overlays": {
+    "review": {
+      "created": "2026-05-30",
+      "official_hash": null,
+      "status": "active"
+    },
+    "docx": {
+      "created": "2026-05-30",
+      "official_hash": null,
+      "status": "active"
+    },
+    "wiki": {
+      "created": "2026-05-30",
+      "official_hash": null,
+      "status": "active"
+    },
+    "security-review": {
+      "created": "2026-05-30",
+      "official_hash": null,
+      "status": "active"
+    },
+    "agent-browser": {
+      "created": "2026-05-30",
+      "official_hash": null,
+      "status": "active"
+    },
+    "simplify": {
+      "created": "2026-05-30",
+      "official_hash": null,
+      "status": "active"
+    },
+    "browse-wiki": {
+      "created": "2026-05-30",
+      "official_hash": null,
+      "status": "active"
+    }
+  },
+  "results": [
+    {
+      "skill": "agent-browser",
+      "status": "OK",
+      "local_file": "/Users/busiji/.factory/skills/agent-browser/SKILL.md",
+      "local_modified": "2026-05-30T12:57:32.542567",
+      "local_description_preview": "Automates browsers and Electron desktop apps (VS Code, Slack, Discord, Figma, Notion, Spotify, etc.)"
+    },
+    {
+      "skill": "browse-wiki",
+      "status": "OK",
+      "local_file": "/Users/busiji/.factory/skills/browse-wiki/SKILL.md",
+      "local_modified": "2026-05-30T12:57:32.906054",
+      "local_description_preview": "Search and read wiki documentation for a repository."
+    },
+    {
+      "skill": "docx",
+      "status": "OK",
+      "local_file": "/Users/busiji/.factory/skills/docx/SKILL.md",
+      "local_modified": "2026-05-30T12:57:32.361870",
+      "local_description_preview": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx fi..."
+    },
+    {
+      "skill": "review",
+      "status": "OK",
+      "local_file": "/Users/busiji/.factory/skills/review/SKILL.md",
+      "local_modified": "2026-05-30T12:51:44.136663",
+      "local_description_preview": "Review code changes and identify high-confidence, actionable bugs."
+    },
+    {
+      "skill": "security-review",
+      "status": "OK",
+      "local_file": "/Users/busiji/.factory/skills/security-review/SKILL.md",
+      "local_modified": "2026-05-30T12:57:32.457936",
+      "local_description_preview": "Security-focused code review using STRIDE, OWASP Top 10, OWASP LLM Top 10, and supply chain analysis..."
+    },
+    {
+      "skill": "simplify",
+      "status": "OK",
+      "local_file": "/Users/busiji/.factory/skills/simplify/SKILL.md",
+      "local_modified": "2026-05-30T12:57:32.688477",
+      "local_description_preview": "Review changed code for reuse, quality, and efficiency, then fix any issues found."
+    },
+    {
+      "skill": "wiki",
+      "status": "OK",
+      "local_file": "/Users/busiji/.factory/skills/wiki/SKILL.md",
+      "local_modified": "2026-05-30T12:57:32.418391",
+      "local_description_preview": "Generate comprehensive codebase documentation for a repository. Uploads the wiki to view in the Fact..."
+    }
+  ]
+}

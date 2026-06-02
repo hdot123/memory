@@ -6,29 +6,24 @@ Creates merge requests via the Merge Requests API.
 
 Usage::
 
-    # Push files to a branch
+    # Push files — 自动创建分支、自动创建 MR
     python scripts/gitlab_api_push.py \
-      --project "infra/memory-core" \
       --branch "fix/my-feature" \
       --message "docs: update INDEX.md" \
-      --file memory/docs/INDEX.md \
-      --file memory/docs/design/INDEX.md
+      --file memory/docs/INDEX.md
 
-    # Create MR
+    # 推送但不创建 MR（WIP 场景）
     python scripts/gitlab_api_push.py \
-      --project "infra/memory-core" \
+      --branch "fix/my-feature" \
+      --message "WIP: work in progress" \
+      --file memory/docs/INDEX.md \
+      --no-mr
+
+    # 只创建 MR（不推送文件）
+    python scripts/gitlab_api_push.py \
+      --branch "fix/my-feature" \
       --create-mr \
-      --source-branch "fix/my-feature" \
-      --target-branch "main" \
-      --title "docs: update INDEX.md"
-
-    # Push with auto-branch
-    python scripts/gitlab_api_push.py \
-      --project "aedu/workbot" \
-      --branch "fix/auto-branch" \
-      --message "fix: update docs" \
-      --file memory/docs/INDEX.md \
-      --auto-branch
+      --mr-title "fix: something"
 """
 from __future__ import annotations
 
@@ -364,6 +359,8 @@ def create_mr(
         "source_branch": source_branch,
         "target_branch": target_branch,
         "title": title,
+        "force_remove_source_branch": True,
+        "remove_source_branch": True,
     }
     if description:
         payload["description"] = description
@@ -423,7 +420,12 @@ def main():
     mr_group.add_argument(
         "--create-mr",
         action="store_true",
-        help="Create a merge request after pushing files.",
+        help="Create a merge request. When --file/--delete is specified, MR is created automatically; use this flag alone to create MR without pushing files.",
+    )
+    mr_group.add_argument(
+        "--no-mr",
+        action="store_true",
+        help="Skip automatic MR creation when pushing files (WIP/temp branch scenario).",
     )
     mr_group.add_argument(
         "--target-branch",
@@ -444,6 +446,25 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Check for protected branch push
+    branch_lower = args.branch.lower()
+    if branch_lower in ("main", "master"):
+        print("Error: 直接推送到 main 分支已被禁止。", file=sys.stderr)
+        print("请使用 feature 分支并通过 MR 合并:", file=sys.stderr)
+        print("  --branch fix/your-feature --auto-branch --create-mr", file=sys.stderr)
+        sys.exit(1)
+
+    # Auto-enable --auto-branch when there are file operations
+    has_file_ops = bool(args.file or args.delete)
+    if has_file_ops and not args.auto_branch:
+        args.auto_branch = True
+
+    # Determine if we should create MR
+    should_create_mr = has_file_ops and not args.no_mr
+    # 兼容：如果只传 --create-mr 没有文件操作，也创建 MR
+    if args.create_mr and not has_file_ops:
+        should_create_mr = True
 
     # Resolve project
     project = args.project or discover_project_from_repo()
@@ -497,7 +518,7 @@ def main():
         print(f"Message: {result.get('title', '?')}")
 
     # Create MR if requested
-    if args.create_mr:
+    if should_create_mr:
         mr_title = args.mr_title or args.message or f"Update branch {args.branch}"
         print(f"\nCreating MR '{mr_title}'...")
 
