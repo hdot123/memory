@@ -34,7 +34,7 @@ test:
     - export PYTHONDONTWRITEBYTECODE=1
   script:
     - ruff check .
-    - python scripts/check_boundary.py
+    - python3 scripts/check_boundary.py
     - pytest -q tests
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
