@@ -93,13 +93,15 @@ github-release:
       - stuck_or_timeout_failure
   rules:
     - if: $CI_COMMIT_TAG
+  before_script:
+    - export ALL_PROXY="http://jdproxy:${GOST_HTTP_PROXY_PASS}@100.100.1.22:11081"
   script:
     - VERSION="${CI_COMMIT_TAG#v}"
     - NOTES=$(sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | head -n -1)
     - if [ -z "$NOTES" ]; then NOTES="See CHANGELOG.md for details."; fi
     - |
       PAYLOAD=$(python3 -c "import json,sys; notes=sys.stdin.read(); print(json.dumps({'tag_name':'$CI_COMMIT_TAG','target_commitish':'main','name':'memory-core $CI_COMMIT_TAG','body':notes,'draft':False,'prerelease':False}))" <<< "$NOTES")
-      curl --header "Authorization: token $GITHUB_TOKEN" --header "Content-Type: application/json" --data "$PAYLOAD" "https://api.github.com/repos/hdot123/memory/releases"
+      curl --proxy "$ALL_PROXY" --header "Authorization: token $GITHUB_TOKEN" --header "Content-Type: application/json" --data "$PAYLOAD" "https://api.github.com/repos/hdot123/memory/releases"
 
 droid-wiki-refresh:
   stage: wiki
