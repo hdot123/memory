@@ -1763,6 +1763,25 @@ def main() -> int:
         except Exception as exc:
             _logger.warning("_log_prompt_submit failed: %s", exc)
 
+    # Layer 2: PostToolUse real-time knowledge capture
+    if args.event == "post-tool-use":
+        capture_script = Path(__file__).parent / "posttooluse_capture.py"
+        if capture_script.exists():
+            try:
+                capture_env = {**os.environ, "MEMORY_HOOK_ORIGINAL_CWD": str(cwd)}
+                subprocess.run(
+                    [sys.executable, str(capture_script)],
+                    input=raw_payload,
+                    text=True,
+                    capture_output=True,
+                    timeout=2,
+                    env=capture_env,
+                )
+            except subprocess.TimeoutExpired:
+                pass
+            except Exception:
+                pass
+
     writer = ArtifactWriter(CONTEXT_ROOT, ERROR_LOG, datetime_module=datetime)
     package = build_context_package(args.host, args.event, payload)
 

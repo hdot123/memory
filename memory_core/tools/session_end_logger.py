@@ -37,8 +37,8 @@ except ImportError:
     sign_project_incremental = None  # type: ignore[misc,assignment]
     load_key = None  # type: ignore[misc,assignment]
 
-# 超时处理：整体超时 2s
-TIMEOUT_SECONDS = 2
+# 超时处理：整体超时 8s（对齐 hooks.json timeout，覆盖 JSONL 解析+写入+签名+捕获）
+TIMEOUT_SECONDS = 8
 
 
 def _set_timeout(seconds: int) -> None:
