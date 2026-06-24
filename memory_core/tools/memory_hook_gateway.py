@@ -1768,6 +1768,7 @@ def main() -> int:
             _log_prompt_submit(cwd, payload)
         except Exception as exc:
             _logger.warning("_log_prompt_submit failed: %s", exc)
+        return 0
 
     # Layer 2: PostToolUse real-time knowledge capture
     if args.event == "post-tool-use":
