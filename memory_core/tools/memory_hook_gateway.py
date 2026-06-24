@@ -1700,7 +1700,7 @@ def main() -> int:
         # develop mode: fall through to normal build_context_package below
 
     if is_denied_project_root(cwd):
-        sys.stdout.write("{}\n")
+        print("ok")
         return 0
 
     # M2: Runtime denylist check — re-verify path at hook time, not just at init time.
@@ -1736,17 +1736,19 @@ def main() -> int:
                     timeout=5,
                     env=guard_env,
                 )
-                if proc.stdout:
+                if proc.returncode == 2:
                     sys.stdout.write(proc.stdout)
-                if proc.stderr:
-                    sys.stderr.write(proc.stderr)
+                    if proc.stderr:
+                        sys.stderr.write(proc.stderr)
+                else:
+                    print("ok")
                 return proc.returncode
             except subprocess.TimeoutExpired:
                 append_error_log("pretooluse-guard", "guard timed out after 5s", {"cwd": str(cwd)})
             except Exception as exc:
                 append_error_log("pretooluse-guard", "guard execution failed", {"error": str(exc)})
         # Fallback: allow if guard unavailable or failed
-        print(json.dumps({"decision": "allow", "reason": "guard unavailable, allowing by default"}))
+        print("ok")
         return 0
 
     # Async: Launch health check in background for session-start
@@ -1781,6 +1783,9 @@ def main() -> int:
                 pass
             except Exception:
                 pass
+        # PostToolUse done — print status, no context package needed
+        print("ok")
+        return 0
 
     writer = ArtifactWriter(CONTEXT_ROOT, ERROR_LOG, datetime_module=datetime)
     package = build_context_package(args.host, args.event, payload)
