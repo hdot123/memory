@@ -63,6 +63,13 @@ POLLUTION_PATTERNS = [
     re.compile(r"\\.git/", re.IGNORECASE),
 ]
 
+# Directories that are exempt from pollution detection.
+# backups/ is a read-only archive for historical snapshots and should not
+# be flagged as pollution, even though it contains business-state files.
+POLLUTION_EXEMPT_DIRS = [
+    "backups",
+]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -199,6 +206,12 @@ def _check_pollution(memory_root: Path) -> list[str]:
             continue
         # Check the file path itself
         rel = str(f.relative_to(memory_root))
+
+        # Skip files in exempt directories (e.g., backups/)
+        path_parts = Path(rel).parts
+        if any(part in POLLUTION_EXEMPT_DIRS for part in path_parts):
+            continue
+
         for pat in POLLUTION_PATTERNS:
             if pat.search(rel):
                 violations.append(f"pollution: path matches pattern in {rel}")
