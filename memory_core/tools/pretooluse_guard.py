@@ -38,6 +38,98 @@ FORBIDDEN_SUFFIXES: tuple[str, ...] = (
 
 FORBIDDEN_DIRS: frozenset[str] = frozenset({"backups"})
 
+# ---------------------------------------------------------------------------
+# M2: 只读命令放行常量
+# ---------------------------------------------------------------------------
+
+READONLY_WHITELIST: frozenset[str] = frozenset({
+    "grep", "cat", "ls", "du", "find", "wc", "head", "tail",
+    "file", "stat", "diff", "rg", "ruff", "python3", "pytest",
+    "memory-validate", "memory-verify-consumer",
+})
+
+WRITE_KEYWORDS: tuple[str, ...] = (
+    ">", ">>", "tee", "sed -i", "cp", "mv", "rm", "mkdir",
+    "touch", "chmod", "chown", "eval", "bash", "sh",
+)
+
+
+def _is_readonly_command(command: str) -> bool:
+    """判断命令是否为纯只读操作（M2 只读放行）。
+
+    返回 True 表示是只读命令，可以放行。
+    条件：
+    1. 首 token 在 READONLY_WHITELIST 中
+    2. 命令中不含 WRITE_KEYWORDS
+    """
+    cmd_stripped = command.strip()
+    if not cmd_stripped:
+        return False
+
+    # 提取首 token
+    first_token = cmd_stripped.split()[0]
+
+    # 检查首 token 是否在白名单中
+    if first_token not in READONLY_WHITELIST:
+        return False
+
+    # 管道符检测：含管道的命令不判定为只读
+    # 防止 cat f | python3 -c "open('x','w')" 等管道写绕过
+    if "|" in cmd_stripped:
+        return False
+
+    # 特殊处理：python3/python -c 命令需要检测代码中的写操作
+    if first_token in ("python3", "python"):
+        if " -c " in cmd_stripped or cmd_stripped.endswith(" -c"):
+            # 检测 Python 写操作模式
+            python_write_patterns = [
+                r'open\s*\([^)]*["\']w["\']',  # open(..., "w")
+                r'open\s*\([^)]*["\']a["\']',  # open(..., "a")
+                r'\.write_text\s*\(',          # Path.write_text()
+                r'\.write_bytes\s*\(',         # Path.write_bytes()
+                r'\.unlink\s*\(',              # Path.unlink()
+                r'\.rmdir\s*\(',               # Path.rmdir()
+                r'os\.remove\s*\(',            # os.remove()
+                r'os\.unlink\s*\(',            # os.unlink()
+                r'shutil\.rmtree\s*\(',        # shutil.rmtree()
+            ]
+            for pattern in python_write_patterns:
+                if re.search(pattern, cmd_stripped):
+                    return False
+            # 如果没有检测到写操作模式，认为是只读
+            return True
+
+    # 检查是否包含写操作关键词
+    cmd_lower = cmd_stripped.lower()
+
+    # 先检查重定向操作符（> 和 >>）
+    # 简单检查：只要包含 > 或 >> 就认为是写操作
+    if ">>" in cmd_lower or ">" in cmd_lower:
+        return False
+
+    # 检查其他写操作关键词
+    for keyword in WRITE_KEYWORDS:
+        if keyword in (">", ">>"):
+            continue  # 已经在上面处理过
+        elif keyword == "sed -i":
+            # 匹配 sed 后跟 -i（可能有空格）
+            if re.search(r'\bsed\s+-i\b', cmd_lower):
+                return False
+        elif keyword == "tee":
+            # 匹配 tee 命令（作为独立命令，不是其他命令的一部分）
+            if re.search(r'\btee\b', cmd_lower):
+                return False
+        elif keyword == "sh":
+            # sh 作为独立命令，排除 -sh 等 flag 后缀（如 du -sh）
+            if re.search(r'(?<!-)\bsh\b', cmd_lower):
+                return False
+        else:
+            # 其他关键词：使用词边界匹配
+            if re.search(rf'\b{keyword}\b', cmd_lower):
+                return False
+
+    return True
+
 
 def _check_file_type_block(file_path: str) -> dict[str, str] | None:
     """检查文件路径是否命中文件类型黑名单。
@@ -576,6 +668,23 @@ def _classify_tool_use(payload: dict[str, Any], project_root: Path) -> dict[str,
                 return {
                     "decision": "allow",
                     "reason": "Git operations (add/commit/push) are allowed for GitHub workflow",
+                }
+
+        # M2: 只读命令放行检查
+        # 首 token 在白名单且无写操作 → 放行
+        # 首 token 在白名单但含写操作 → 拦截（防止绕过保护）
+        first_token = command.strip().split()[0] if command.strip() else ""
+        if first_token in READONLY_WHITELIST:
+            if _is_readonly_command(command):
+                return {
+                    "decision": "allow",
+                    "reason": "Read-only command with whitelisted first token and no write operations",
+                }
+            else:
+                # 白名单首 token 但含写操作关键词，直接拦截
+                return {
+                    "decision": "block",
+                    "reason": f"Read-whitelisted command '{first_token}' contains write operation keywords",
                 }
 
         # Extract target paths from command
