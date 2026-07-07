@@ -53,6 +53,12 @@ class TestSigningInvocationAtInit:
     def test_sign_project_incremental_called_once(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Unit test with mocked signer -> assert mock_sign.call_count == 1."""
         _mock_source_repo(monkeypatch)
+        # CI environments may have a read-only HOME; provide a test key so
+        # load_or_create_key does not raise before sign_project_incremental runs.
+        monkeypatch.setattr(
+            "memory_core.tools.memory_hook_integrity_keys.load_or_create_key",
+            lambda path=None: b"test" * 8,
+        )
         target = _make_target(tmp_path)
 
         with patch(
@@ -73,6 +79,12 @@ class TestSigningInvocationAtInit:
     def test_sign_called_after_last_file_write(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify sign is called after all file creation is complete."""
         _mock_source_repo(monkeypatch)
+        # CI environments may have a read-only HOME; provide a test key so
+        # load_or_create_key does not raise before sign_project_incremental runs.
+        monkeypatch.setattr(
+            "memory_core.tools.memory_hook_integrity_keys.load_or_create_key",
+            lambda path=None: b"test" * 8,
+        )
         target = _make_target(tmp_path)
 
         call_order = []
