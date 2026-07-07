@@ -18,11 +18,13 @@ SCRIPT_PATH = Path(__file__).resolve()
 try:
     from ..constants import SYSTEM_DIR
     from .denied_project_roots import is_denied_project_root
+    from .denylist import check_denylist
     from .memory_root_discovery import discover_roots
     from .project_lifecycle import record_project_lifecycle
 except ImportError:
     from memory_core.constants import SYSTEM_DIR
     from memory_core.tools.denied_project_roots import is_denied_project_root
+    from memory_core.tools.denylist import check_denylist
     from memory_core.tools.memory_root_discovery import discover_roots
     from memory_core.tools.project_lifecycle import record_project_lifecycle
 REPO_ROOT, WORKSPACE_ROOT = discover_roots(Path.cwd())
@@ -1699,6 +1701,22 @@ def main() -> int:
 
     if is_denied_project_root(cwd):
         sys.stdout.write("{}\n")
+        return 0
+
+    # M2: Runtime denylist check — re-verify path at hook time, not just at init time.
+    # allow_non_git=True because the gateway runs for already-initialized projects,
+    # which may have been initialized with --allow-non-git.
+    _deny_result = check_denylist(cwd, allow_non_git=True)
+    if _deny_result.denied:
+        _logger.warning(
+            "Gateway denied project root by denylist rule '%s': %s",
+            _deny_result.rule, _deny_result.message,
+        )
+        sys.stdout.write(json.dumps({
+            "status": "denied",
+            "denylist_rule": _deny_result.rule,
+            "denylist_message": _deny_result.message,
+        }, ensure_ascii=False) + "\n")
         return 0
 
     if _should_noop_for_external_context(payload):
