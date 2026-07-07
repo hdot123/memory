@@ -75,6 +75,10 @@ def check_denylist(target: Path, allow_non_git: bool = False) -> DenylistResult:
     5. Junk directory name patterns
     6. Non-git directories (if allow_non_git is False)
     """
+    # Test-only bypass: allow pytest tests to bypass denylist checks
+    if os.environ.get("MEMORY_CORE_BYPASS_DENYLIST") == "1":
+        return DenylistResult.denied_ok()
+
     target_resolved = target.resolve()
     target_name = target_resolved.name
 

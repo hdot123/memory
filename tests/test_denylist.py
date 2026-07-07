@@ -11,9 +11,26 @@ The denylist rejects:
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def disable_denylist_bypass():
+    """Disable the denylist bypass for denylist tests.
+
+    The conftest.py sets MEMORY_CORE_BYPASS_DENYLIST=1 for all tests to allow
+    tmp_path usage. This fixture explicitly disables it so denylist tests can
+    actually test the denylist logic.
+    """
+    old_val = os.environ.get("MEMORY_CORE_BYPASS_DENYLIST")
+    if "MEMORY_CORE_BYPASS_DENYLIST" in os.environ:
+        del os.environ["MEMORY_CORE_BYPASS_DENYLIST"]
+    yield
+    if old_val is not None:
+        os.environ["MEMORY_CORE_BYPASS_DENYLIST"] = old_val
 
 
 def _make_non_tmp_dir(tmp_path: Path) -> Path:
