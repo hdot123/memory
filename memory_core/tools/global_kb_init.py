@@ -14,6 +14,8 @@ The global KB contains cross-project reusable knowledge organized into four doma
 
 This structure is created once and shared across all projects that enable global KB.
 """
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Dict
 
