@@ -110,11 +110,12 @@ def test_install_factory_hooks_writes_wrapper_and_settings_json(monkeypatch, tmp
     assert str(init) in wrapper_text
     assert "exec \"$MEMORY_HOOK_GATEWAY\" \"$@\"" in wrapper_text
 
-    settings = json.loads(settings_path.read_text(encoding="utf-8"))
-    assert set(settings["hooks"]) == {"SessionStart", "UserPromptSubmit", "Stop", "Notification", "PreToolUse", "PostToolUse", "SubagentStop", "PreCompact", "SessionEnd"}
+    # hooks.json migration: hooks now stored in hooks.json, not settings.json
+    hooks = json.loads((factory_home / "hooks.json").read_text(encoding="utf-8"))
+    assert set(hooks) == {"SessionStart", "UserPromptSubmit", "Stop", "Notification", "PreToolUse", "PostToolUse", "SubagentStop", "PreCompact", "SessionEnd"}
     commands = [
         hook["command"]
-        for event_groups in settings["hooks"].values()
+        for event_groups in hooks.values()
         for group in event_groups
         for hook in group["hooks"]
     ]
@@ -122,8 +123,12 @@ def test_install_factory_hooks_writes_wrapper_and_settings_json(monkeypatch, tmp
     assert all(str(wrapper) in command for command in commands)
     assert all("--host factory" in command for command in commands)
 
+    # Verify settings.json no longer carries hooks (migrated to hooks.json)
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert "hooks" not in settings
+
     # Verify PreToolUse hook exists with correct event
-    pretooluse_hooks = settings["hooks"].get("PreToolUse", [])
+    pretooluse_hooks = hooks.get("PreToolUse", [])
     assert len(pretooluse_hooks) >= 1
     pretooluse_commands = [
         h["command"]
@@ -430,12 +435,12 @@ def test_pretooluse_hook_registered_in_settings_json(monkeypatch, tmp_path: Path
     result = install_factory_hooks(factory_home=factory_home, storage_root=storage_root)
 
     assert result["success"] is True
-    settings_path = factory_home / "settings.json"
-    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    # hooks.json migration: hooks now stored in hooks.json, not settings.json
+    hooks = json.loads((factory_home / "hooks.json").read_text(encoding="utf-8"))
 
     # Verify PreToolUse hook exists
-    assert "PreToolUse" in settings["hooks"]
-    pretooluse_hooks = settings["hooks"]["PreToolUse"]
+    assert "PreToolUse" in hooks
+    pretooluse_hooks = hooks["PreToolUse"]
     assert len(pretooluse_hooks) >= 1
 
     # Verify the command uses pre-tool-use event
@@ -474,11 +479,12 @@ def test_pretooluse_existing_user_hooks_preserved(monkeypatch, tmp_path: Path) -
     result = install_factory_hooks(factory_home=factory_home, storage_root=tmp_path / "store")
 
     assert result["success"] is True
-    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    # hooks.json migration: hooks migrated from settings.json to hooks.json
+    hooks = json.loads((factory_home / "hooks.json").read_text(encoding="utf-8"))
 
     # User PreToolUse hooks should be preserved
-    assert "PreToolUse" in settings["hooks"]
-    pretooluse_hooks = settings["hooks"]["PreToolUse"]
+    assert "PreToolUse" in hooks
+    pretooluse_hooks = hooks["PreToolUse"]
     user_hooks = [h for g in pretooluse_hooks for h in g.get("hooks", []) if "user-custom-guard" in str(h.get("command", ""))]
     assert len(user_hooks) >= 1
 

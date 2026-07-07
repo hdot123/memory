@@ -61,6 +61,11 @@ def settings_path(factory_home: Path) -> Path:
     return factory_home / "settings.json"
 
 
+def hooks_path(factory_home: Path) -> Path:
+    """Return the Factory hooks.json file path."""
+    return factory_home / "hooks.json"
+
+
 def _looks_like_path(command: str) -> bool:
     return command.startswith("~") or "/" in command
 
@@ -275,6 +280,69 @@ def merge_factory_settings(existing: dict[str, Any], desired: dict[str, Any]) ->
     return merged
 
 
+def _normalize_hooks_json(raw: dict[str, Any]) -> dict[str, Any]:
+    """Normalize hooks.json: if a top-level ``hooks`` wrapper key exists,
+    unwrap it so events are at the top level (Factory expected format).
+
+    Factory expects events (SessionStart, PostToolUse, etc.) at the JSON root.
+    A ``{"hooks": {...}}`` wrapper is silently ignored with a warning.
+    """
+    if "hooks" in raw and isinstance(raw["hooks"], dict):
+        inner = raw.pop("hooks")
+        for k, v in inner.items():
+            raw.setdefault(k, v)
+    return raw
+
+
+def _load_hooks_json(path: Path, warnings: list[str]) -> dict[str, Any]:
+    """Load hooks.json file, returning empty dict if not exists or invalid.
+
+    Automatically unwraps a ``{"hooks": {...}}`` wrapper if present,
+    since Factory expects events at the top level.
+    """
+    if not path.exists():
+        return {}
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        warnings.append(f"hooks.json corrupt or unreadable, treated as empty: {exc}")
+        return {}
+    if not isinstance(loaded, dict):
+        warnings.append("hooks.json root is not an object, treated as empty")
+        return {}
+    if "hooks" in loaded and isinstance(loaded["hooks"], dict):
+        warnings.append("hooks.json had a 'hooks' wrapper key; unwrapping to top-level events")
+        loaded = _normalize_hooks_json(loaded)
+    return loaded
+
+
+def merge_hooks_json(existing: dict[str, Any], desired: dict[str, Any]) -> dict[str, Any]:
+    """Merge desired memory hooks into hooks.json, preserving third-party hooks.
+
+    Both ``existing`` and ``desired`` may use either top-level event keys
+    or a ``{"hooks": {...}}`` wrapper. The wrapper is normalized away.
+    """
+    # Normalize: unwrap hooks wrapper if present
+    existing_norm = _normalize_hooks_json(dict(existing))
+    desired_norm = _normalize_hooks_json(dict(desired))
+    merged: dict[str, Any] = existing_norm
+    # desired_factory_hooks returns {"hooks": {event: groups}} — after normalize,
+    # events are at top level. Iterate over desired events directly.
+    for event_name, desired_groups in desired_norm.items():
+        if event_name in ("hooks",):
+            continue
+        kept_groups = _filter_memory_hooks(merged.get(event_name, []))
+        merged[event_name] = kept_groups + desired_groups
+    return merged
+
+
+def clean_settings_hooks(settings: dict[str, Any]) -> dict[str, Any]:
+    """Remove hooks key from settings.json, preserving all other settings."""
+    cleaned = dict(settings)
+    cleaned.pop("hooks", None)
+    return cleaned
+
+
 def install_factory_hooks(
     *,
     factory_home: Path | None = None,
@@ -294,12 +362,15 @@ def install_factory_hooks(
 
     resolved_gateway = resolve_gateway_command(gateway_command, warnings)
     resolved_init = resolve_init_command(init_command, warnings)
+    hooks_file = hooks_path(factory_home)
+
     if resolved_gateway is None or resolved_init is None:
         return {
             "success": False,
             "warnings": warnings,
             "factory_home": str(factory_home),
             "settings_path": str(settings_file),
+            "hooks_path": str(hooks_file),
             "wrapper_path": str(wrapper),
             "backups": backups,
         }
@@ -310,8 +381,29 @@ def install_factory_hooks(
         init_command=resolved_init,
     )
     desired = desired_factory_hooks(wrapper, timeout=timeout)
-    existing = _load_settings_json(settings_file, warnings)
-    merged = merge_factory_settings(existing, desired)
+
+    # --- Migration: extract old hooks from settings.json (if any) ---
+    existing_settings = _load_settings_json(settings_file, warnings)
+    old_hooks_from_settings: dict[str, Any] = {}
+    if isinstance(existing_settings.get("hooks"), dict) and existing_settings["hooks"]:
+        old_hooks_from_settings = dict(existing_settings["hooks"])
+
+    # --- Load existing hooks.json ---
+    existing_hooks = _load_hooks_json(hooks_file, warnings)
+
+    # Merge: start with old hooks from settings.json (if migrating), then existing hooks.json on top
+    migration_source: dict[str, Any] = {}
+    if old_hooks_from_settings:
+        migration_source = {"hooks": old_hooks_from_settings}
+    merged_hooks = merge_hooks_json(existing_hooks, {"hooks": {}})
+    if migration_source:
+        merged_hooks = merge_hooks_json(merged_hooks, migration_source)
+
+    # Now merge the desired memory hooks into hooks.json
+    merged_hooks = merge_hooks_json(merged_hooks, desired)
+
+    # Clean settings.json: remove hooks key
+    cleaned_settings = clean_settings_hooks(existing_settings)
 
     result: dict[str, Any] = {
         "success": True,
@@ -319,25 +411,35 @@ def install_factory_hooks(
         "warnings": warnings,
         "factory_home": str(factory_home),
         "settings_path": str(settings_file),
+        "hooks_path": str(hooks_file),
         "wrapper_path": str(wrapper),
         "storage_root": str(storage_root),
         "gateway_command": resolved_gateway,
         "init_command": resolved_init,
         "backups": backups,
-        "settings": merged if dry_run else None,
+        "hooks": merged_hooks if dry_run else None,
+        "settings": cleaned_settings if dry_run else None,
     }
 
     if dry_run:
         return result
 
+    # Write wrapper
     wrapper.parent.mkdir(parents=True, exist_ok=True)
     wrapper.write_text(wrapper_content, encoding="utf-8")
     wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
 
+    # Write hooks.json
+    hooks_file.parent.mkdir(parents=True, exist_ok=True)
+    if hooks_file.exists():
+        backups.append(str(_backup_existing_file(hooks_file)))
+    hooks_file.write_text(json.dumps(merged_hooks, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    # Update settings.json: remove hooks key
     settings_file.parent.mkdir(parents=True, exist_ok=True)
     if settings_file.exists():
         backups.append(str(_backup_existing_file(settings_file)))
-    settings_file.write_text(json.dumps(merged, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    settings_file.write_text(json.dumps(cleaned_settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     return result
 
@@ -376,6 +478,7 @@ def main(argv: list[str] | None = None) -> int:
             action = "Would install" if result.get("dry_run") else "Installed"
             print(f"{action} Factory memory hook wrapper: {result['wrapper_path']}")
             print(f"{action} Factory settings: {result['settings_path']}")
+            print(f"{action} Hooks configuration: {result.get('hooks_path', 'N/A')}")
         else:
             print("Factory memory hook install failed", file=sys.stderr)
         for warning in result.get("warnings", []):

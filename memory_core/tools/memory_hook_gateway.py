@@ -1694,13 +1694,17 @@ def main() -> int:
     if is_memory_core_source_repo(cwd):
         mode = get_source_repo_mode(cwd)
         if mode != "develop":
+            # For tool events, output minimal allow — no context package needed
+            if args.event in ("pre-tool-use", "post-tool-use", "prompt-submit", "stop", "notification", "subagent-stop", "pre-compact"):
+                if args.event == "pre-tool-use":
+                    sys.stdout.write('{"decision":"allow"}\n')
+                return 0
             readonly_package = _build_readonly_source_repo_package(cwd, args.host, args.event)
             sys.stdout.write(json.dumps(readonly_package, ensure_ascii=False) + "\n")
             return 0
         # develop mode: fall through to normal build_context_package below
 
     if is_denied_project_root(cwd):
-        sys.stdout.write("{}\n")
         return 0
 
     # M2: Runtime denylist check — re-verify path at hook time, not just at init time.
@@ -1736,17 +1740,19 @@ def main() -> int:
                     timeout=5,
                     env=guard_env,
                 )
-                if proc.stdout:
+                if proc.returncode == 2:
                     sys.stdout.write(proc.stdout)
-                if proc.stderr:
-                    sys.stderr.write(proc.stderr)
+                    if proc.stderr:
+                        sys.stderr.write(proc.stderr)
+                else:
+                    sys.stdout.write('{"decision":"allow"}\n')
                 return proc.returncode
             except subprocess.TimeoutExpired:
                 append_error_log("pretooluse-guard", "guard timed out after 5s", {"cwd": str(cwd)})
             except Exception as exc:
                 append_error_log("pretooluse-guard", "guard execution failed", {"error": str(exc)})
         # Fallback: allow if guard unavailable or failed
-        print(json.dumps({"decision": "allow", "reason": "guard unavailable, allowing by default"}))
+        sys.stdout.write('{"decision":"allow"}\n')
         return 0
 
     # Async: Launch health check in background for session-start
@@ -1762,6 +1768,28 @@ def main() -> int:
             _log_prompt_submit(cwd, payload)
         except Exception as exc:
             _logger.warning("_log_prompt_submit failed: %s", exc)
+        return 0
+
+    # Layer 2: PostToolUse real-time knowledge capture
+    if args.event == "post-tool-use":
+        capture_script = Path(__file__).parent / "posttooluse_capture.py"
+        if capture_script.exists():
+            try:
+                capture_env = {**os.environ, "MEMORY_HOOK_ORIGINAL_CWD": str(cwd)}
+                subprocess.run(
+                    [sys.executable, str(capture_script)],
+                    input=raw_payload,
+                    text=True,
+                    capture_output=True,
+                    timeout=2,
+                    env=capture_env,
+                )
+            except subprocess.TimeoutExpired:
+                pass
+            except Exception:
+                pass
+        # PostToolUse done — no context package needed
+        return 0
 
     writer = ArtifactWriter(CONTEXT_ROOT, ERROR_LOG, datetime_module=datetime)
     package = build_context_package(args.host, args.event, payload)
