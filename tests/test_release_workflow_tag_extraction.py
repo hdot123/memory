@@ -9,6 +9,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 import pytest
 
 
@@ -197,7 +202,6 @@ class TestPyprojectVersionConsistency:
     @pytest.fixture
     def pyproject_version(self) -> str:
         """Read version from pyproject.toml."""
-        import tomllib
         pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
         with pyproject_path.open("rb") as f:
             config = tomllib.load(f)

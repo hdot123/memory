@@ -55,6 +55,11 @@ class TestALayerSigning:
         project = _create_minimal_project(tmp_path)
         today = datetime.now().strftime("%Y-%m-%d")
 
+        # Provide a test key so signing can proceed
+        monkeypatch.setattr(
+            "memory_core.tools.memory_hook_integrity_keys.load_key",
+            lambda path=None: b"test" * 8,
+        )
         monkeypatch.setattr(
             "memory_core.tools.memory_hook_integrity_manifest.is_memory_core_source_repo",
             lambda p: False,
@@ -209,7 +214,7 @@ class TestBLayerSigning:
         project = _create_minimal_project(tmp_path)
         today = datetime.now().strftime("%Y-%m-%d")
 
-        # 创建 sessions.md（B层需要读取）
+        # Create sessions.md (B layer needs to read this)
         sessions_md = project / "memory" / "log" / f"{today}-sessions.md"
         sessions_md.write_text(
             f"# Sessions Log — {today}\n\n"
@@ -223,6 +228,11 @@ class TestBLayerSigning:
             "---\n"
         )
 
+        # Provide a test key so signing can proceed
+        monkeypatch.setattr(
+            "memory_core.tools.memory_hook_integrity_keys.load_key",
+            lambda path=None: b"test" * 8,
+        )
         monkeypatch.setattr(
             "memory_core.tools.memory_hook_integrity_manifest.is_memory_core_source_repo",
             lambda p: False,
@@ -303,6 +313,11 @@ class TestCLayerSigning:
         project = _create_minimal_project(tmp_path)
         today = datetime.now().strftime("%Y-%m-%d")
 
+        # Provide a test key so signing can proceed
+        monkeypatch.setattr(
+            "memory_core.tools.memory_hook_integrity_keys.load_key",
+            lambda path=None: b"test" * 8,
+        )
         monkeypatch.setattr(
             "memory_core.tools.memory_hook_integrity_manifest.is_memory_core_source_repo",
             lambda p: False,
