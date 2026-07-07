@@ -622,40 +622,10 @@ def _classify_tool_use(payload: dict[str, Any], project_root: Path) -> dict[str,
             return {"decision": "allow", "reason": "No owned paths detected in Execute"}
 
     elif tool_name == "Task":
-        # 5b.2: Fix cwd to project_root — do not follow PWD changes
-        fixed_root = _get_project_root_for_task(project_root)
-
-        # 5b.1: Parse task prompt and inject ownership policy block
-        prompt = payload.get("prompt", "")
-        policy_block = _build_ownership_policy_block(fixed_root)
-
-        # Check if prompt already contains policy injection (idempotent)
-        if isinstance(prompt, str) and "<!-- ownership-policy-injection -->" in prompt:
-            injected_prompt = prompt
-        else:
-            injected_prompt = f"{policy_block}\n\n{prompt}" if isinstance(prompt, str) else prompt
-
-        # Check paths in the task prompt
-        paths = _parse_task_paths(payload)
-        if paths:
-            for path in paths:
-                result = classify_owned_path(path, load_memory_ownership(fixed_root), fixed_root)
-                if hasattr(result, "level"):
-                    return {
-                        "decision": "block",
-                        "reason": f"Task references protected path '{path}': {result.reason}",
-                        "injected_prompt": injected_prompt,
-                    }
-            return {
-                "decision": "allow",
-                "reason": "No owned paths in Task prompt",
-                "injected_prompt": injected_prompt,
-            }
-        return {
-            "decision": "allow",
-            "reason": "Task without owned path references",
-            "injected_prompt": injected_prompt,
-        }
+        # Task tool: no path pre-scan. Sub-agent file operations are guarded
+        # by their own PreToolUse events. Scanning prompt text for keywords
+        # causes false positives (e.g. mentioning AGENTS.md in instructions).
+        return {"decision": "allow", "reason": "Task tool — sub-agent operations guarded individually"}
 
     # Unknown tool - allow
     return {"decision": "allow", "reason": f"Unknown tool: {tool_name}"}
@@ -669,11 +639,9 @@ def main() -> int:
     # Read JSON payload from stdin
     try:
         payload = json.load(sys.stdin)
-    except json.JSONDecodeError as e:
-        print(json.dumps({"decision": "allow", "reason": f"Invalid JSON input: {e}"}))
+    except json.JSONDecodeError:
         return 0
-    except Exception as e:
-        print(json.dumps({"decision": "allow", "reason": f"Error reading input: {e}"}))
+    except Exception:
         return 0
 
     # Normalize payload: Factory hooks wrap tool params in tool_input
@@ -686,24 +654,19 @@ def main() -> int:
     # Get project root
     project_root = _load_project_root()
     if project_root is None:
-        print(json.dumps({"decision": "allow", "reason": "Cannot determine project root"}))
         return 0
 
     # Check if memory/system exists (if not, this isn't a memory-managed project)
     if not (project_root / "memory" / "system").exists():
-        print(json.dumps({
-            "decision": "allow",
-            "reason": "Not a memory-managed project (no memory/system directory)"
-        }))
         return 0
 
     # Classify the tool use
     result = _classify_tool_use(payload, project_root)
 
-    # Output JSON result
+    # Output: always output JSON so Factory and tests can parse it.
+    # Allow = minimal, Block = full reason.
     print(json.dumps(result))
 
-    # Exit code: 0 = allow, 2 = block
     if result["decision"] == "block":
         return 2
     return 0

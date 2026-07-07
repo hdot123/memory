@@ -220,19 +220,38 @@ class TestGatewayPretooluseBranch:
         assert output["decision"] == "block"
 
     def test_gateway_returns_structured_json(self, tmp_path: Path) -> None:
-        """Verify gateway stdout contains valid JSON with decision field."""
+        """Verify gateway stdout contains valid JSON with decision field.
+
+        New contract: allow outputs minimal JSON (no reason),
+        block outputs full JSON with reason.
+        """
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
-        payload = _make_payload(
+        # --- allow case: minimal output, no reason required ---
+        allow_payload = _make_payload(
             "Write",
             file_path="src/main.py",
             content="pass",
         )
 
-        rc, stdout, stderr = _run_gateway("pre-tool-use", payload, cwd=tmp_path)
+        rc, stdout, stderr = _run_gateway("pre-tool-use", allow_payload, cwd=tmp_path)
 
-        # Must be valid JSON
+        assert rc == 0, f"Expected exit code 0, got {rc}. stderr={stderr}"
         output = json.loads(stdout)
         assert "decision" in output
-        assert output["decision"] in ("allow", "block")
+        assert output["decision"] == "allow"
+
+        # --- block case: full output with reason ---
+        block_payload = _make_payload(
+            "Write",
+            file_path="memory/docs/protected.md",
+            content="test",
+        )
+
+        rc, stdout, stderr = _run_gateway("pre-tool-use", block_payload, cwd=tmp_path)
+
+        assert rc == 2, f"Expected exit code 2, got {rc}. stderr={stderr}"
+        output = json.loads(stdout)
+        assert "decision" in output
+        assert output["decision"] == "block"
         assert "reason" in output
