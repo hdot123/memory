@@ -47,6 +47,11 @@ except ImportError:  # pragma: no cover - 防御性回退
     is_memory_core_source_repo = None  # type: ignore[assignment]
 
 try:
+    from memory_core.tools.artifact_retention import clean_artifacts
+except ImportError:  # pragma: no cover - 防御性回退
+    clean_artifacts = None  # type: ignore[assignment]
+
+try:
     import yaml  # type: ignore[import-not-found]
     _HAS_YAML = True
 except ImportError:  # pragma: no cover - 缺 PyYAML 时跳过基础设施检查
@@ -164,6 +169,169 @@ def _make_violation(
         "file": file,
         "detail": detail,
     }
+
+
+# ---------------------------------------------------------------------------
+# Per-project memory-validate (VAL-M2-012, VAL-M2-013)
+# ---------------------------------------------------------------------------
+
+def run_per_project_validate(
+    projects: list[tuple[str, Path]],
+) -> dict[str, dict[str, Any]]:
+    """Run memory-validate --json for each registered project.
+
+    Args:
+        projects: List of (project_name, project_path) tuples from path-index.json.
+
+    Returns:
+        Dict mapping project_name -> validate result dict.
+        Missing paths return {"status": "skipped", "skipped": True}.
+        Failed validates return {"status": "fail", "errors": [...]}.
+        Successful validates return {"status": "ok"}.
+    """
+    results: dict[str, dict[str, Any]] = {}
+
+    for name, project_path in projects:
+        # Skip missing paths (VAL-M2-017)
+        if not project_path.exists():
+            print(
+                f"[validate] 跳过不存在的项目: {name} ({project_path})",
+                file=sys.stderr,
+            )
+            results[name] = {
+                "status": "skipped",
+                "skipped": True,
+                "reason": "项目路径不存在",
+            }
+            continue
+
+        # Run memory-validate --target <path> --json
+        cmd = [
+            sys.executable,
+            "-m",
+            "memory_core.tools.validate_project_memory",
+            "--target",
+            str(project_path),
+            "--json",
+        ]
+
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            # Parse JSON output
+            try:
+                validate_result = json.loads(proc.stdout)
+            except (json.JSONDecodeError, ValueError):
+                # If JSON parsing fails, treat as failure
+                results[name] = {
+                    "status": "fail",
+                    "errors": [f"memory-validate JSON 解析失败: {proc.stdout[:200]}"],
+                }
+                continue
+
+            # Check status
+            status = validate_result.get("status", "unknown")
+            if status == "ok":
+                results[name] = {"status": "ok"}
+            else:
+                # Extract errors/violations
+                errors = []
+                checks = validate_result.get("checks", {})
+                for check_name, check_result in checks.items():
+                    if not check_result.get("ok", True):
+                        violations = check_result.get("violations", [])
+                        errors.extend(violations)
+
+                results[name] = {
+                    "status": "fail",
+                    "errors": errors if errors else ["memory-validate failed"],
+                }
+
+        except subprocess.TimeoutExpired:
+            results[name] = {
+                "status": "fail",
+                "errors": ["memory-validate 超时 (>60s)"],
+            }
+        except Exception as e:
+            results[name] = {
+                "status": "fail",
+                "errors": [f"memory-validate 异常: {e}"],
+            }
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Retention cleanup (VAL-M2-015)
+# ---------------------------------------------------------------------------
+
+def run_retention_cleanup(
+    projects: list[tuple[str, Path]],
+    repo_root: Path,
+    days: int = 30,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Run artifact retention cleanup for repo and all registered projects.
+
+    Args:
+        projects: List of (project_name, project_path) tuples.
+        repo_root: Path to memory-core source repo.
+        days: Delete artifacts older than this many days.
+        dry_run: If True, report without deleting.
+
+    Returns:
+        Dict with cleanup results per target.
+    """
+    if clean_artifacts is None:
+        print(
+            "[retention] artifact_retention 模块不可用，跳过清理",
+            file=sys.stderr,
+        )
+        return {"error": "clean_artifacts 不可用"}
+
+    results: dict[str, Any] = {}
+
+    # 1. Clean repo artifacts
+    repo_hook = repo_root / "memory" / "artifacts" / "memory-hook"
+    if repo_hook.exists():
+        print(f"[retention] 清理本仓库产物: {repo_hook}", file=sys.stderr)
+        try:
+            report = clean_artifacts(repo_hook, days=days, dry_run=dry_run)
+            results["repo"] = report.to_dict()
+        except Exception as e:
+            results["repo"] = {"error": str(e)}
+    else:
+        results["repo"] = {"skipped": True, "reason": "repo hook 目录不存在"}
+
+    # 2. Clean each project's artifacts
+    for name, project_path in projects:
+        # Skip missing paths
+        if not project_path.exists():
+            print(
+                f"[retention] 跳过不存在的项目: {name} ({project_path})",
+                file=sys.stderr,
+            )
+            results[name] = {"skipped": True, "reason": "项目路径不存在"}
+            continue
+
+        project_hook = project_path / "artifacts" / "memory-hook"
+        if not project_hook.exists():
+            results[name] = {"skipped": True, "reason": "项目 hook 目录不存在"}
+            continue
+
+        print(f"[retention] 清理项目产物: {name} ({project_hook})", file=sys.stderr)
+        try:
+            report = clean_artifacts(project_hook, days=days, dry_run=dry_run)
+            results[name] = report.to_dict()
+        except Exception as e:
+            results[name] = {"error": str(e)}
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -1421,6 +1589,25 @@ def _summarize_report(report: dict[str, Any]) -> str:
     lines.append(f"违规总数: {report['total_violations']}")
     lines.append("")
 
+    # Add validate results summary (VAL-M2-013, VAL-M2-014)
+    validate_results = report.get("validate_results", {})
+    if validate_results:
+        failing_projects = [
+            name for name, result in validate_results.items()
+            if result.get("status") == "fail"
+        ]
+        if failing_projects:
+            lines.append(f"❌ memory-validate 失败项目 ({len(failing_projects)}):")
+            for name in failing_projects:
+                result = validate_results[name]
+                errors = result.get("errors", [])
+                lines.append(f"  • {name}: {len(errors)} 个错误")
+                for error in errors[:3]:  # Show first 3 errors
+                    lines.append(f"    - {error}")
+                if len(errors) > 3:
+                    lines.append(f"    ...还有 {len(errors) - 3} 个错误")
+            lines.append("")
+
     if report["total_violations"] == 0:
         lines.append("✅ 全部项目通过，无违规。")
         # 即便无违规，也附上基础设施摘要（若有）
@@ -1758,8 +1945,33 @@ def main(argv: list[str] | None = None) -> int:
                 "error": str(e),
             }
 
-    # 4. 组装 + 写报告（含基础设施检查结果）
+    # 4. Per-project memory-validate (VAL-M2-012, VAL-M2-013)
+    print("[audit] 开始逐项目 memory-validate…", file=sys.stderr)
+    validate_results = run_per_project_validate(projects)
+    validate_failed = sum(
+        1 for r in validate_results.values() if r.get("status") == "fail"
+    )
+    validate_skipped = sum(
+        1 for r in validate_results.values() if r.get("status") == "skipped"
+    )
+    print(
+        f"[audit] memory-validate 完成: "
+        f"成功={len(validate_results) - validate_failed - validate_skipped} "
+        f"失败={validate_failed} 跳过={validate_skipped}",
+        file=sys.stderr,
+    )
+
+    # 5. Retention cleanup (VAL-M2-015)
+    print("[audit] 开始 retention 清理…", file=sys.stderr)
+    repo_root = Path(__file__).parent.parent.parent
+    retention_results = run_retention_cleanup(projects, repo_root)
+    print("[audit] retention 清理完成", file=sys.stderr)
+
+    # 6. 组装 + 写报告（含基础设施检查结果）
     report = build_report(projects_results, infrastructure=infra_results)
+    # 添加 validate 和 retention 结果到报告
+    report["validate_results"] = validate_results
+    report["retention_results"] = retention_results
     out_path: Path | None = None
     if not args.no_write:
         out_path = write_report(report)
