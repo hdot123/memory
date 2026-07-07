@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 
 from memory_core.tools.factory_global_hooks import (
+    _load_hooks_json,
     _normalize_hooks_json,
     merge_hooks_json,
-    _load_hooks_json,
 )
 
 
