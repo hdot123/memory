@@ -58,8 +58,6 @@ memory-audit-daily = "memory_core.tools.daily_kb_audit:main"
 [tool.setuptools.packages.find]
 include = ["memory_core*"]
 
-[tool.setuptools.package-data]
-workspace = ["templates/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
