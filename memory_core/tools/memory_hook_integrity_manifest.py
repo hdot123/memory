@@ -39,6 +39,7 @@ import hashlib
 import hmac as _hmac
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -100,6 +101,17 @@ VOLATILE_PATTERNS = [
     "memory/system/errors/",  # date-partitioned error logs
 ]
 
+# Junk file patterns that should never be signed (OS/system artifacts)
+# These are noise files that pollute the manifest and should be excluded.
+JUNK_PATTERNS = [
+    re.compile(r'.DS_Store'),  # macOS folder metadata
+    re.compile(r'__pycache__'),  # Python bytecode cache
+    re.compile(r'\.pyc$'),  # Compiled Python files
+    re.compile(r'Thumbs\.db'),  # Windows thumbnail cache
+    re.compile(r'\.coverage$'),  # Coverage.py data file
+    re.compile(r'\.pytest_cache'),  # pytest cache directory
+]
+
 
 def _is_volatile(rel_path: str) -> bool:
     """Check if a relative path matches a volatile pattern."""
@@ -113,6 +125,30 @@ def _is_volatile(rel_path: str) -> bool:
         else:
             if normalized == pattern:
                 return True
+    return False
+
+
+def _is_junk(rel_path: str) -> bool:
+    """Check if a relative path matches a junk file pattern.
+
+    Junk files are OS/system artifacts that should never be signed.
+    Checks both the filename and path components.
+    """
+    # Normalize to forward slashes
+    normalized = rel_path.replace("\\", "/")
+
+    # Check each pattern against the full path
+    for pattern in JUNK_PATTERNS:
+        if pattern.search(normalized):
+            return True
+
+    # Also check if any path component matches
+    path_parts = normalized.split("/")
+    for part in path_parts:
+        for pattern in JUNK_PATTERNS:
+            if pattern.search(part):
+                return True
+
     return False
 
 
@@ -286,6 +322,9 @@ def _discover_canonical_files(
             if rel == f"{SYSTEM_DIR}/{MANIFEST_FILENAME}":
                 continue
             if _is_volatile(rel):
+                continue
+            # Skip junk files (OS/system artifacts)
+            if _is_junk(rel):
                 continue
             unique.append(p)
     return unique

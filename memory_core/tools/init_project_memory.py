@@ -64,7 +64,7 @@ from memory_core.ownership import (
     classify_owned_path,
     load_memory_ownership,
 )
-from memory_core.tools.denied_project_roots import is_denied_project_root
+from memory_core.tools.denylist import check_denylist
 from memory_core.tools.global_kb_init import create_global_kb_structure, get_global_kb_root
 
 # Setup logging for template warnings
@@ -1744,6 +1744,7 @@ def init_project_memory(
     sync_mirror_remote: str = "",
     sync_mirror_url: str = "",
     auto_fill: bool = True,
+    allow_non_git: bool = False,
 ) -> dict[str, Any]:
     """Initialize memory/system/ directory skeleton in the target project.
 
@@ -1788,8 +1789,10 @@ def init_project_memory(
     memory_root = target / "memory" / "system"
     project_name = _project_name(target, scope)
 
-    if is_denied_project_root(target):
-        result["errors"].append(f"Refusing to initialize memory in denied project root: {target.resolve()}")
+    # Check denylist: reject paths in tmp, ~/.factory, $HOME, junk patterns, non-git
+    deny_result = check_denylist(target, allow_non_git=allow_non_git)
+    if deny_result.denied:
+        result["errors"].append(f"Project denied by denylist rule '{deny_result.rule}': {deny_result.message}")
         result["mode"] = "error"
         return result
 
@@ -2590,6 +2593,12 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Disable automatic project info detection and template filling.",
     )
+    parser.add_argument(
+        "--allow-non-git",
+        action="store_true",
+        default=False,
+        help="Allow initialization in non-git directories (default: reject non-git).",
+    )
     try:
         _pkg_version = importlib.metadata.version("memory-core")
     except importlib.metadata.PackageNotFoundError:
@@ -2625,6 +2634,7 @@ def main(argv: list[str] | None = None) -> int:
         sync_mirror_remote=args.sync_mirror_remote,
         sync_mirror_url=args.sync_mirror_url,
         auto_fill=not args.no_auto_fill,
+        allow_non_git=args.allow_non_git,
     )
 
     if args.json or args.dry_run:

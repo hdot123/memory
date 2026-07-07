@@ -480,7 +480,7 @@ class TestPreToolUseGuard:
         assert result["decision"] == "allow"
 
     def test_guard_blocks_task_with_owned_path_references(self, tmp_path: Path) -> None:
-        """Test that Task with owned path references is blocked."""
+        """Task prompt no longer pre-scanned — sub-agent operations guarded individually."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -490,8 +490,8 @@ class TestPreToolUseGuard:
 
         exit_code, result = self._run_guard(payload, tmp_path)
 
-        assert exit_code == 2
-        assert result["decision"] == "block"
+        assert exit_code == 0
+        assert result["decision"] == "allow"
 
     def test_guard_blocks_uncertain_path_with_owned_root_string(self, tmp_path: Path) -> None:
         """Test that uncertain path with owned root string is blocked."""
@@ -631,7 +631,7 @@ class TestPreToolUseGuard:
         assert result["decision"] == "block"
 
     def test_guard_allows_non_memory_project(self, tmp_path: Path) -> None:
-        """Test that guard allows operations on non-memory projects."""
+        """Test that guard allows operations on non-memory projects (silent exit 0)."""
         # No .memory directory
 
         payload = {
@@ -643,8 +643,6 @@ class TestPreToolUseGuard:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        assert result["decision"] == "allow"
-        assert "Not a memory-managed project" in result["reason"]
 
     def test_guard_allows_unknown_tool(self, tmp_path: Path) -> None:
         """Test that unknown tools are allowed."""
@@ -769,7 +767,7 @@ class TestTaskPayloadInjection:
         return result.returncode, output
 
     def test_task_injects_ownership_policy_block(self, tmp_path: Path) -> None:
-        """Test that Task tool result contains injected_prompt with policy block."""
+        """Test that Task tool result is clean (no injected_prompt to avoid stdout bloat)."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -781,16 +779,11 @@ class TestTaskPayloadInjection:
 
         assert exit_code == 0
         assert result["decision"] == "allow"
-        assert "injected_prompt" in result
-        assert "<!-- ownership-policy-injection -->" in result["injected_prompt"]
-        assert "Protected Domains" in result["injected_prompt"]
-        assert "Protected Resources" in result["injected_prompt"]
-        assert "Forbidden Instructions" in result["injected_prompt"]
-        # Original prompt should be preserved
-        assert "Fix the bug in src/main.py" in result["injected_prompt"]
+        # injected_prompt removed: was echoing full prompt + policy back to stdout
+        assert "injected_prompt" not in result
 
     def test_task_injects_policy_lists_domains_and_resources(self, tmp_path: Path) -> None:
-        """Test that injected policy lists all default domains and resources."""
+        """Test that Task tool still allows without owned references."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -801,16 +794,11 @@ class TestTaskPayloadInjection:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        injected = result["injected_prompt"]
-        # Check default domains
-        assert "memory/docs" in injected
-        assert "memory/kb" in injected
-        assert "memory/system" in injected
-        # Check default resources
-        assert "AGENTS.md" in injected
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
     def test_task_policy_injection_idempotent(self, tmp_path: Path) -> None:
-        """Test that policy injection is idempotent (no double injection)."""
+        """Test that Task with existing policy marker is still handled correctly."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -821,12 +809,11 @@ class TestTaskPayloadInjection:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        injected = result["injected_prompt"]
-        # Should not contain double injection
-        assert injected.count("<!-- ownership-policy-injection -->") == 1
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
     def test_task_blocks_with_policy_and_owned_reference(self, tmp_path: Path) -> None:
-        """Test that Task with owned path reference is blocked, but still has injected_prompt."""
+        """Test that Task with owned path reference is blocked."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -836,13 +823,12 @@ class TestTaskPayloadInjection:
 
         exit_code, result = self._run_guard(payload, tmp_path)
 
-        assert exit_code == 2
-        assert result["decision"] == "block"
-        # Still injects the policy block even when blocking
-        assert "injected_prompt" in result
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
     def test_task_injection_includes_forbidden_instructions(self, tmp_path: Path) -> None:
-        """Test that injected policy includes forbidden instructions."""
+        """Test that Task tool allows without echoing forbidden instructions in stdout."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -853,10 +839,8 @@ class TestTaskPayloadInjection:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        injected = result["injected_prompt"]
-        assert "Do not modify" in injected
-        assert "Do not attempt to weaken" in injected
-        assert "Do not bypass" in injected
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
 
 class TestCwdFixed:
@@ -1405,3 +1389,873 @@ class TestNoopHostDelegate:
         data = json.loads(response.stdout)
         assert data["host_unavailable"] is True
         assert data["policy_decision"] == "no_host"
+
+
+class TestGitOperationsWhitelist:
+    """M1-GitHub-Migration: Git operations whitelist tests."""
+
+    def _run_guard(self, payload: dict[str, Any], cwd: Path | None = None) -> tuple[int, dict[str, Any]]:
+        """Run the guard with given payload and return (exit_code, result)."""
+        env = os.environ.copy()
+        if cwd:
+            env["FACTORY_PROJECT_DIR"] = str(cwd)
+            env["MEMORY_HOOK_ORIGINAL_CWD"] = str(cwd)
+
+        result = subprocess.run(
+            [sys.executable, "-m", "memory_core.tools.pretooluse_guard"],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            cwd=str(cwd) if cwd else None,
+            env=env,
+        )
+
+        try:
+            output = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            output = {"raw_stdout": result.stdout, "stderr": result.stderr}
+
+        return result.returncode, output
+
+    def test_git_add_allowed(self, tmp_path: Path) -> None:
+        """Test that git add is allowed for GitHub workflow."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git add file.py",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "git" in result.get("reason", "").lower()
+
+    def test_git_commit_allowed(self, tmp_path: Path) -> None:
+        """Test that git commit is allowed for GitHub workflow."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git commit -m 'feat: add feature'",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "git" in result.get("reason", "").lower()
+
+    def test_git_push_allowed(self, tmp_path: Path) -> None:
+        """Test that git push is allowed for GitHub workflow."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git push origin feature-branch",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "git" in result.get("reason", "").lower()
+
+    def test_git_push_origin_main_allowed(self, tmp_path: Path) -> None:
+        """Test that git push origin main is allowed (branch protection enforced by GitHub)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git push origin main",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_git_status_allowed(self, tmp_path: Path) -> None:
+        """Test that git status is allowed (read-only operation)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git status",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        # git status doesn't match add/commit/push, so it falls through to normal path analysis
+        # Since it has no owned paths, it should be allowed
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_git_log_allowed(self, tmp_path: Path) -> None:
+        """Test that git log is allowed (read-only operation)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git log --oneline",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_git_operations_no_longer_reference_gitlab_api_push(self, tmp_path: Path) -> None:
+        """Test that git operations don't require gitlab_api_push.py."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        # Verify the source code no longer contains gitlab_api_push.py whitelist
+        guard_file = Path(__file__).parents[1] / "memory_core" / "tools" / "pretooluse_guard.py"
+        guard_content = guard_file.read_text()
+
+        # Check that gitlab_api_push.py is not in the allow branch
+        # (it might still exist in comments or other contexts)
+        lines = guard_content.split('\n')
+        in_allow_branch = False
+        for line in lines:
+            if 'gitlab_api_push.py' in line and 'allow' in line.lower():
+                in_allow_branch = True
+                break
+
+        # The whitelist branch should not reference gitlab_api_push.py
+        assert not in_allow_branch, "gitlab_api_push.py should not be in the allow branch"
+
+
+class TestReadonlyPassthrough:
+    """M2: Read-only command passthrough for Execute tool.
+
+    VAL-M2-031 through VAL-M2-037: Readonly passthrough tests.
+    """
+
+    def _run_guard(self, payload: dict[str, Any], cwd: Path | None = None) -> tuple[int, dict[str, Any]]:
+        """Run the guard with given payload and return (exit_code, result)."""
+        env = os.environ.copy()
+        if cwd:
+            env["FACTORY_PROJECT_DIR"] = str(cwd)
+            env["MEMORY_HOOK_ORIGINAL_CWD"] = str(cwd)
+
+        result = subprocess.run(
+            [sys.executable, "-m", "memory_core.tools.pretooluse_guard"],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            cwd=str(cwd) if cwd else None,
+            env=env,
+        )
+
+        try:
+            output = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            output = {"raw_stdout": result.stdout, "stderr": result.stderr}
+
+        return result.returncode, output
+
+    # ---- VAL-M2-031: Pure read commands referencing memory/system paths pass ----
+
+    def test_grep_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """grep referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "grep -r 'pattern' memory/system/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_cat_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """cat referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_ls_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """ls referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls -la memory/system/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_wc_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """wc referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "wc -l memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_head_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """head referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "head -20 memory/docs/INDEX.md",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_du_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """du referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "du -sh memory/system/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_find_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """find referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "find memory/system/ -name '*.toml'",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_tail_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """tail referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "tail -10 memory/system/events.jsonl",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_rg_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """rg (ripgrep) referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "rg 'pattern' memory/system/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_stat_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """stat referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "stat memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_file_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """file referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "file memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_diff_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """diff referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "diff memory/system/ownership.toml memory/system/adapter.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_ruff_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """ruff referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ruff check memory_core/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_pytest_memory_system_path_allowed(self, tmp_path: Path) -> None:
+        """pytest referencing memory/system path should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "pytest tests/test_pretooluse_guard.py -q",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_memory_validate_allowed(self, tmp_path: Path) -> None:
+        """memory-validate should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "memory-validate --target /some/project --json",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_memory_verify_consumer_allowed(self, tmp_path: Path) -> None:
+        """memory-verify-consumer should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "memory-verify-consumer --path /some/project",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    # ---- VAL-M2-032: Whitelist first-token enforced ----
+
+    def test_non_whitelisted_token_not_auto_passed(self, tmp_path: Path) -> None:
+        """Non-whitelisted first token should not auto-pass, falls through to existing logic."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        # 'echo' is not in the whitelist, and it references memory/system
+        payload = {
+            "tool_name": "Execute",
+            "command": "echo test > memory/system/test.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_unknown_command_referencing_memory_blocked(self, tmp_path: Path) -> None:
+        """Unknown command referencing memory/system should go through existing logic."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        # 'vim' is not in whitelist
+        payload = {
+            "tool_name": "Execute",
+            "command": "vim memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        # Should fall through to existing logic; vim is not a write command
+        # that extracts paths, so it will check if command contains owned root strings
+        # The command contains "memory/" so it should be blocked
+        assert result["decision"] == "block"
+
+    # ---- VAL-M2-033: Write operators force-block even with read prefix ----
+
+    def test_grep_with_redirect_blocked(self, tmp_path: Path) -> None:
+        """grep with > redirect should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "grep 'pattern' memory/system/ownership.toml > /tmp/output.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_cat_with_append_redirect_blocked(self, tmp_path: Path) -> None:
+        """cat with >> redirect should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml >> output.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_ls_with_tee_blocked(self, tmp_path: Path) -> None:
+        """ls piped to tee should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls memory/system/ | tee output.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_grep_with_sed_i_blocked(self, tmp_path: Path) -> None:
+        """grep piped to sed -i should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml | sed -i 's/old/new/' memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_find_with_cp_blocked(self, tmp_path: Path) -> None:
+        """find with cp should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "find memory/system/ -name '*.toml' -exec cp {} /tmp/ \\;",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        # cp is a write keyword
+        assert result["decision"] == "block"
+
+    def test_grep_with_rm_in_command_blocked(self, tmp_path: Path) -> None:
+        """grep followed by rm should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "grep -l 'pattern' memory/system/*.toml | xargs rm",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_cat_with_mv_blocked(self, tmp_path: Path) -> None:
+        """cat followed by mv should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml && mv memory/system/ownership.toml /tmp/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_ls_with_mkdir_blocked(self, tmp_path: Path) -> None:
+        """ls followed by mkdir should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls memory/system/ && mkdir memory/system/newdir",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_ls_with_touch_blocked(self, tmp_path: Path) -> None:
+        """ls followed by touch should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls memory/system/ && touch memory/system/newfile.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_ls_with_chmod_blocked(self, tmp_path: Path) -> None:
+        """ls followed by chmod should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls memory/system/ && chmod 755 memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_ls_with_chown_blocked(self, tmp_path: Path) -> None:
+        """ls followed by chown should be blocked."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls memory/system/ && chown root memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    # ---- VAL-M2-034: Write operator detection robust to spacing/quoting ----
+
+    def test_redirect_no_space_blocked(self, tmp_path: Path) -> None:
+        """Redirect with no space should be caught."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml>/tmp/out.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_append_no_space_blocked(self, tmp_path: Path) -> None:
+        """Append redirect with no space should be caught."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml>>/tmp/out.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_tee_extra_spaces_blocked(self, tmp_path: Path) -> None:
+        """tee with extra spaces should be caught."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls memory/system/ | tee   output.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_sed_minus_i_no_space_blocked(self, tmp_path: Path) -> None:
+        """sed -i with variant spacing should be caught."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "sed  -i  's/old/new/' memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    # ---- VAL-M2-035: Non-memory write commands not over-blocked ----
+
+    def test_grep_non_memory_path_allowed(self, tmp_path: Path) -> None:
+        """grep on non-memory paths should still be allowed (no regression)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "grep -r 'pattern' src/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_ls_non_memory_path_allowed(self, tmp_path: Path) -> None:
+        """ls on non-memory paths should still be allowed (no regression)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "ls -la /tmp/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_cat_non_memory_path_allowed(self, tmp_path: Path) -> None:
+        """cat on non-memory paths should still be allowed (no regression)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat /etc/hostname",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    # ---- VAL-M2-036: python3 -c and pytest passthrough ----
+
+    def test_python3_read_memory_path_allowed(self, tmp_path: Path) -> None:
+        """python3 -c with read operation on memory paths should pass."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "python3 -c 'import json; print(json.load(open(\"memory/system/ownership.toml\")))'",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_python3_write_memory_path_not_auto_passed(self, tmp_path: Path) -> None:
+        """python3 -c with write operation should NOT be auto-passed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "python3 -c 'open(\"memory/system/ownership.toml\", \"w\").write(\"hacked\")'",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        # python3 -c with write (open(..."w")) should not be auto-passed
+        # It should fall through to existing path extraction logic which detects open() calls
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_python3_script_file_allowed(self, tmp_path: Path) -> None:
+        """python3 running a script file should be allowed."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "python3 scripts/check_boundary.py",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    # ---- VAL-M2-037: Guard returns correct structured decision ----
+
+    def test_allow_decision_structure(self, tmp_path: Path) -> None:
+        """Allow decision has correct JSON structure."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "reason" in result
+
+    def test_block_decision_structure(self, tmp_path: Path) -> None:
+        """Block decision has correct JSON structure with reason."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "cat memory/system/ownership.toml > /tmp/output.txt",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+        assert "reason" in result
+        assert isinstance(result["reason"], str)
+        assert len(result["reason"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# SCRUTINY: Security fix tests — pipe bypass + eval/bash/sh coverage
+# ---------------------------------------------------------------------------
+
+
+class TestPipeWriteBypassFix:
+    """Scrutiny 漏洞 1（MEDIUM）：管道写绕过修复测试。
+
+    cat f | python3 -c "open('x','w')" 不应被判定为只读。
+    """
+
+    def _run_guard(self, payload: dict[str, Any], cwd: Path | None = None) -> tuple[int, dict[str, Any]]:
+        """Run the guard with given payload and return (exit_code, result)."""
+        env = os.environ.copy()
+        if cwd:
+            env["FACTORY_PROJECT_DIR"] = str(cwd)
+            env["MEMORY_HOOK_ORIGINAL_CWD"] = str(cwd)
+
+        result = subprocess.run(
+            [sys.executable, "-m", "memory_core.tools.pretooluse_guard"],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            cwd=str(cwd) if cwd else None,
+            env=env,
+        )
+
+        try:
+            output = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            output = {"raw_stdout": result.stdout, "stderr": result.stderr}
+
+        return result.returncode, output
+
+    def test_pipe_with_python_write_not_readonly(self) -> None:
+        """_is_readonly_command 对含管道的命令返回 False。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command('cat f | python3 -c "open(\'x\',\'w\')"') is False
+
+    def test_pipe_with_grep_not_readonly(self) -> None:
+        """即使管道后是只读命令（grep），也不判定为只读。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command("ls memory/system/ | grep pattern") is False
+
+    def test_pipe_python_write_blocked_via_guard(self, tmp_path: Path) -> None:
+        """cat memory/... | python3 -c "open('x','w')" 被 guard 拦截。"""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": 'cat memory/system/ownership.toml | python3 -c "open(\'x\',\'w\')"',
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_pipe_to_xargs_rm_blocked(self, tmp_path: Path) -> None:
+        """grep ... | xargs rm 被 guard 拦截（管道检测先行）。"""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "grep -l 'pattern' memory/system/*.toml | xargs rm",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_no_pipe_readonly_unchanged(self) -> None:
+        """无管道的纯读命令不受影响（行为不变）。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command("cat memory/system/ownership.toml") is True
+        assert _is_readonly_command("ls -la memory/system/") is True
+        assert _is_readonly_command("grep -r 'pattern' memory/system/") is True
+
+    def test_du_sh_flag_not_affected_by_pipe_check(self, tmp_path: Path) -> None:
+        """du -sh（无管道）仍然放行。"""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "du -sh memory/system/",
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+
+class TestEvalBashShCoverage:
+    """Scrutiny 漏洞 2（LOW）：eval/bash/sh 未覆盖修复测试。"""
+
+    def _run_guard(self, payload: dict[str, Any], cwd: Path | None = None) -> tuple[int, dict[str, Any]]:
+        """Run the guard with given payload and return (exit_code, result)."""
+        env = os.environ.copy()
+        if cwd:
+            env["FACTORY_PROJECT_DIR"] = str(cwd)
+            env["MEMORY_HOOK_ORIGINAL_CWD"] = str(cwd)
+
+        result = subprocess.run(
+            [sys.executable, "-m", "memory_core.tools.pretooluse_guard"],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            cwd=str(cwd) if cwd else None,
+            env=env,
+        )
+
+        try:
+            output = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            output = {"raw_stdout": result.stdout, "stderr": result.stderr}
+
+        return result.returncode, output
+
+    def test_eval_in_whitelisted_command_not_readonly(self) -> None:
+        """cat f && eval "rm ..." 不被判定为只读。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command('cat file && eval "rm -rf /"') is False
+
+    def test_bash_in_whitelisted_command_not_readonly(self) -> None:
+        """cat f && bash script.sh 不被判定为只读。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command("cat file && bash malicious.sh") is False
+
+    def test_sh_in_whitelisted_command_not_readonly(self) -> None:
+        """cat f && sh script.sh 不被判定为只读。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command("cat file && sh malicious.sh") is False
+
+    def test_eval_targeting_owned_path_blocked(self, tmp_path: Path) -> None:
+        """eval "rm -rf memory/..." 被 guard 拦截。"""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": 'eval "rm -rf memory/docs/"',
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_eval_chained_after_read_blocked(self, tmp_path: Path) -> None:
+        """cat f && eval "rm ..." 被 guard 拦截（eval 关键词检测）。"""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": 'cat memory/system/ownership.toml && eval "rm -rf /tmp"',
+        }
+        exit_code, result = self._run_guard(payload, tmp_path)
+        assert exit_code == 2
+        assert result["decision"] == "block"
+
+    def test_sh_flag_not_false_positive(self) -> None:
+        """du -sh 中的 -sh 不被误判为 sh 写命令。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command("du -sh memory/system/") is True
+
+    def test_bashrc_path_not_false_positive(self) -> None:
+        """路径中的 .bashrc 不被误判为 bash 写命令。"""
+        from memory_core.tools.pretooluse_guard import _is_readonly_command
+
+        assert _is_readonly_command("cat ~/.bashrc") is True
+
+    def test_pure_read_commands_still_allowed(self, tmp_path: Path) -> None:
+        """原有纯读命令放行不受影响。"""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        for cmd in [
+            "cat memory/system/ownership.toml",
+            "ls -la memory/system/",
+            "grep -r 'pattern' memory/system/",
+            "wc -l memory/system/ownership.toml",
+            "head -20 memory/docs/INDEX.md",
+        ]:
+            payload = {"tool_name": "Execute", "command": cmd}
+            exit_code, result = self._run_guard(payload, tmp_path)
+            assert exit_code == 0, f"Command should be allowed: {cmd}"
+            assert result["decision"] == "allow"

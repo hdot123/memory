@@ -111,7 +111,7 @@ def test_artifact_and_error_logs_are_date_partitioned(monkeypatch, tmp_path: Pat
     assert daily_latest.is_file()
     assert latest.is_file()
     assert daily_events.is_file()
-    assert legacy_events.is_file()
+    assert not legacy_events.is_file()  # events.jsonl no longer written
     refs = json.loads(snapshot.read_text(encoding="utf-8"))["artifact_refs"]
     assert refs["snapshot"] == str(snapshot)
     assert refs["daily_latest"] == str(daily_latest)
