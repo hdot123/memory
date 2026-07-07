@@ -1177,8 +1177,6 @@ def write_artifacts(package: dict[str, Any]) -> dict[str, str]:
         daily_event_log.parent.mkdir(parents=True, exist_ok=True)
         with daily_event_log.open("a", encoding="utf-8") as handle:
             handle.write(event_line)
-        with EVENT_LOG.open("a", encoding="utf-8") as handle:
-            handle.write(event_line)
         return {"snapshot": str(snapshot_path), "latest": str(latest_path), "event_log": str(daily_event_log)}
 
 

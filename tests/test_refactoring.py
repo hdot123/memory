@@ -267,7 +267,7 @@ class TestArtifactWriter:
         assert snapshot.is_file()
         assert latest.is_file()
         assert event_log.is_file()
-        assert legacy_event_log.is_file()
+        assert not legacy_event_log.is_file()  # events.jsonl no longer written
 
         content = json.loads(snapshot.read_text(encoding="utf-8"))
         assert content["host"] == "factory"
