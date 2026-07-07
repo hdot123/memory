@@ -55,30 +55,24 @@ memory-core 是只读协议仓库，提供 .memory/ 协议、模板、Schema、C
 
 完整决策树见 `docs/CLASSIFICATION.md`。
 
-## 铁律：GitLab API 推送
+## 铁律：GitHub 直接推送
 
-**所有代码变更必须通过 `scripts/gitlab_api_push.py` 推送，禁止使用手动 git 命令。**
-
-详细使用方法见 `memory/docs/runbooks/GIT_PUSH_SPEC.md`。
+**所有代码变更直接推送到 GitHub，使用标准 git 命令。**
 
 核心要点：
-- 禁止 `git add` / `git commit` / `git push`（被 hooks 拦截）
-- Token 优先级：`GITLAB_ADMIN_TOKEN` > `CE_GITLAB_TOKEN` > remote URL 提取
-- 项目路径：`infra/memory-core`（需 admin token）、`aedu/workbot`
-- **所有 commit 消息、MR 标题/描述必须使用中文**（如 `fix: 修复 discover_project_root 根目录解析错误`）
-- **禁止直接推送 main** — main 分支已设为 "No one can push"，必须走 feature 分支 + MR
-- **MR 是默认流程** — 推送文件后脚本自动创建 MR，合并后自动删除源分支
-- 仅 WIP 场景可使用 `--no-mr` 跳过 MR 创建
+- 使用 `git add` / `git commit` / `git push origin <branch>`
+- **所有 commit 消息必须使用中文**（如 `fix: 修复 discover_project_root 根目录解析错误`）
+- **禁止直接推送 main** — main 分支受保护，必须走 feature 分支 + PR
+- **PR 是默认流程** — 推送 feature 分支后创建 PR，合并后自动删除源分支
 
-## 铁律：GitLab → GitHub 单向同步
+## 铁律：GitHub 为主仓库
 
-**所有 Factory/Droid 接入的项目必须遵守：**
+**GitHub 已成为主仓库，所有开发流程迁移到 GitHub。**
 
-1. **代码只推 GitLab** — Agent/人/CI 都只 push 到 GitLab，创建 MR
-2. **CI 门禁** — test + health-check 通过后才可合并到 main
-3. **GitHub 是只读镜像** — 只有 GitLab CI 的 sync-to-github job 可以推 GitHub
-4. **禁止直推 GitHub** — 任何 `git push origin main` 都是违规，会破坏单源真相
-5. **违规恢复** — 如果意外直推 GitHub，回退 GitHub commit，重新走 GitLab 流程
+1. **代码推送到 GitHub** — Agent/人/CI 都直接 push 到 GitHub
+2. **CI 门禁** — GitHub Actions 的 test + health-check 通过后才可合并到 main
+3. **PR 流程** — 推送 feature 分支后创建 PR，通过 code review 后合并
+4. **GitLab 保留** — GitLab remote 保留用于历史备份，但不再作为主开发流程
 
 ## Linear Gateway
 

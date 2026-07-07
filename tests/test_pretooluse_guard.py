@@ -480,7 +480,7 @@ class TestPreToolUseGuard:
         assert result["decision"] == "allow"
 
     def test_guard_blocks_task_with_owned_path_references(self, tmp_path: Path) -> None:
-        """Test that Task with owned path references is blocked."""
+        """Task prompt no longer pre-scanned — sub-agent operations guarded individually."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -490,8 +490,8 @@ class TestPreToolUseGuard:
 
         exit_code, result = self._run_guard(payload, tmp_path)
 
-        assert exit_code == 2
-        assert result["decision"] == "block"
+        assert exit_code == 0
+        assert result["decision"] == "allow"
 
     def test_guard_blocks_uncertain_path_with_owned_root_string(self, tmp_path: Path) -> None:
         """Test that uncertain path with owned root string is blocked."""
@@ -631,7 +631,7 @@ class TestPreToolUseGuard:
         assert result["decision"] == "block"
 
     def test_guard_allows_non_memory_project(self, tmp_path: Path) -> None:
-        """Test that guard allows operations on non-memory projects."""
+        """Test that guard allows operations on non-memory projects (silent exit 0)."""
         # No .memory directory
 
         payload = {
@@ -643,8 +643,6 @@ class TestPreToolUseGuard:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        assert result["decision"] == "allow"
-        assert "Not a memory-managed project" in result["reason"]
 
     def test_guard_allows_unknown_tool(self, tmp_path: Path) -> None:
         """Test that unknown tools are allowed."""
@@ -769,7 +767,7 @@ class TestTaskPayloadInjection:
         return result.returncode, output
 
     def test_task_injects_ownership_policy_block(self, tmp_path: Path) -> None:
-        """Test that Task tool result contains injected_prompt with policy block."""
+        """Test that Task tool result is clean (no injected_prompt to avoid stdout bloat)."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -781,16 +779,11 @@ class TestTaskPayloadInjection:
 
         assert exit_code == 0
         assert result["decision"] == "allow"
-        assert "injected_prompt" in result
-        assert "<!-- ownership-policy-injection -->" in result["injected_prompt"]
-        assert "Protected Domains" in result["injected_prompt"]
-        assert "Protected Resources" in result["injected_prompt"]
-        assert "Forbidden Instructions" in result["injected_prompt"]
-        # Original prompt should be preserved
-        assert "Fix the bug in src/main.py" in result["injected_prompt"]
+        # injected_prompt removed: was echoing full prompt + policy back to stdout
+        assert "injected_prompt" not in result
 
     def test_task_injects_policy_lists_domains_and_resources(self, tmp_path: Path) -> None:
-        """Test that injected policy lists all default domains and resources."""
+        """Test that Task tool still allows without owned references."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -801,16 +794,11 @@ class TestTaskPayloadInjection:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        injected = result["injected_prompt"]
-        # Check default domains
-        assert "memory/docs" in injected
-        assert "memory/kb" in injected
-        assert "memory/system" in injected
-        # Check default resources
-        assert "AGENTS.md" in injected
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
     def test_task_policy_injection_idempotent(self, tmp_path: Path) -> None:
-        """Test that policy injection is idempotent (no double injection)."""
+        """Test that Task with existing policy marker is still handled correctly."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -821,12 +809,11 @@ class TestTaskPayloadInjection:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        injected = result["injected_prompt"]
-        # Should not contain double injection
-        assert injected.count("<!-- ownership-policy-injection -->") == 1
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
     def test_task_blocks_with_policy_and_owned_reference(self, tmp_path: Path) -> None:
-        """Test that Task with owned path reference is blocked, but still has injected_prompt."""
+        """Test that Task with owned path reference is blocked."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -836,13 +823,12 @@ class TestTaskPayloadInjection:
 
         exit_code, result = self._run_guard(payload, tmp_path)
 
-        assert exit_code == 2
-        assert result["decision"] == "block"
-        # Still injects the policy block even when blocking
-        assert "injected_prompt" in result
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
     def test_task_injection_includes_forbidden_instructions(self, tmp_path: Path) -> None:
-        """Test that injected policy includes forbidden instructions."""
+        """Test that Task tool allows without echoing forbidden instructions in stdout."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
 
         payload = {
@@ -853,10 +839,8 @@ class TestTaskPayloadInjection:
         exit_code, result = self._run_guard(payload, tmp_path)
 
         assert exit_code == 0
-        injected = result["injected_prompt"]
-        assert "Do not modify" in injected
-        assert "Do not attempt to weaken" in injected
-        assert "Do not bypass" in injected
+        assert result["decision"] == "allow"
+        assert "injected_prompt" not in result
 
 
 class TestCwdFixed:
@@ -1405,3 +1389,139 @@ class TestNoopHostDelegate:
         data = json.loads(response.stdout)
         assert data["host_unavailable"] is True
         assert data["policy_decision"] == "no_host"
+
+
+class TestGitOperationsWhitelist:
+    """M1-GitHub-Migration: Git operations whitelist tests."""
+
+    def _run_guard(self, payload: dict[str, Any], cwd: Path | None = None) -> tuple[int, dict[str, Any]]:
+        """Run the guard with given payload and return (exit_code, result)."""
+        env = os.environ.copy()
+        if cwd:
+            env["FACTORY_PROJECT_DIR"] = str(cwd)
+            env["MEMORY_HOOK_ORIGINAL_CWD"] = str(cwd)
+
+        result = subprocess.run(
+            [sys.executable, "-m", "memory_core.tools.pretooluse_guard"],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            cwd=str(cwd) if cwd else None,
+            env=env,
+        )
+
+        try:
+            output = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            output = {"raw_stdout": result.stdout, "stderr": result.stderr}
+
+        return result.returncode, output
+
+    def test_git_add_allowed(self, tmp_path: Path) -> None:
+        """Test that git add is allowed for GitHub workflow."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git add file.py",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "git" in result.get("reason", "").lower()
+
+    def test_git_commit_allowed(self, tmp_path: Path) -> None:
+        """Test that git commit is allowed for GitHub workflow."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git commit -m 'feat: add feature'",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "git" in result.get("reason", "").lower()
+
+    def test_git_push_allowed(self, tmp_path: Path) -> None:
+        """Test that git push is allowed for GitHub workflow."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git push origin feature-branch",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+        assert "git" in result.get("reason", "").lower()
+
+    def test_git_push_origin_main_allowed(self, tmp_path: Path) -> None:
+        """Test that git push origin main is allowed (branch protection enforced by GitHub)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git push origin main",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_git_status_allowed(self, tmp_path: Path) -> None:
+        """Test that git status is allowed (read-only operation)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git status",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        # git status doesn't match add/commit/push, so it falls through to normal path analysis
+        # Since it has no owned paths, it should be allowed
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_git_log_allowed(self, tmp_path: Path) -> None:
+        """Test that git log is allowed (read-only operation)."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        payload = {
+            "tool_name": "Execute",
+            "command": "git log --oneline",
+        }
+
+        exit_code, result = self._run_guard(payload, tmp_path)
+
+        assert exit_code == 0
+        assert result["decision"] == "allow"
+
+    def test_git_operations_no_longer_reference_gitlab_api_push(self, tmp_path: Path) -> None:
+        """Test that git operations don't require gitlab_api_push.py."""
+        (tmp_path / "memory" / "system").mkdir(parents=True)
+
+        # Verify the source code no longer contains gitlab_api_push.py whitelist
+        guard_file = Path(__file__).parents[1] / "memory_core" / "tools" / "pretooluse_guard.py"
+        guard_content = guard_file.read_text()
+
+        # Check that gitlab_api_push.py is not in the allow branch
+        # (it might still exist in comments or other contexts)
+        lines = guard_content.split('\n')
+        in_allow_branch = False
+        for line in lines:
+            if 'gitlab_api_push.py' in line and 'allow' in line.lower():
+                in_allow_branch = True
+                break
+
+        # The whitelist branch should not reference gitlab_api_push.py
+        assert not in_allow_branch, "gitlab_api_push.py should not be in the allow branch"

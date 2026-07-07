@@ -569,12 +569,14 @@ def _classify_tool_use(payload: dict[str, Any], project_root: Path) -> dict[str,
         if not command:
             return {"decision": "allow", "reason": "Execute without command"}
 
-        # Known safe scripts: only read local files and push via API, no local writes
-        if "gitlab_api_push.py" in command:
-            return {
-                "decision": "allow",
-                "reason": "gitlab_api_push.py is a read-only local operation (pushes via GitLab API)",
-            }
+        # Git operations: allow git add/commit/push for GitHub workflow
+        cmd_parts = command.strip().split()
+        if cmd_parts and cmd_parts[0] == "git":
+            if len(cmd_parts) >= 2 and cmd_parts[1] in ("add", "commit", "push"):
+                return {
+                    "decision": "allow",
+                    "reason": "Git operations (add/commit/push) are allowed for GitHub workflow",
+                }
 
         # Extract target paths from command
         paths = _extract_path_from_execute(command)
