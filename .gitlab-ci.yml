@@ -9,7 +9,6 @@ stages:
   - health_check
   - sync
   - release
-  - wiki
   - notify
 
 variables:
@@ -102,16 +101,6 @@ github-release:
     - |
       PAYLOAD=$(python3 -c "import json,sys; notes=sys.stdin.read(); print(json.dumps({'tag_name':'$CI_COMMIT_TAG','target_commitish':'main','name':'memory-core $CI_COMMIT_TAG','body':notes,'draft':False,'prerelease':False}))" <<< "$NOTES")
       curl --proxy "$ALL_PROXY" --header "Authorization: token $GITHUB_TOKEN" --header "Content-Type: application/json" --data "$PAYLOAD" "https://api.github.com/repos/hdot123/memory/releases"
-
-droid-wiki-refresh:
-  stage: wiki
-  script:
-    - |
-      curl -s http://localhost:5555/hooks/wiki-refresh \
-        -H "Content-Type: application/json" \
-        -d '{"ref":"main","project":"memory-core"}'
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
 
 test-failed:
   stage: notify
