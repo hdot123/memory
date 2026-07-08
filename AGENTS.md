@@ -25,15 +25,14 @@ memory-core 是只读协议仓库，提供 .memory/ 协议、模板、Schema、C
 
 路由规则仅由以下文件定义，AGENTS.md 只做方向性引用，不嵌入任何路由逻辑。
 
-**读取链**：Agent 启动 → AGENTS.md (行为约束) → 指向性引用 → memory-routing.md (路由规则) → project-map (合法入口) → memory/kb (实际知识)。
+**读取链**：Agent 启动 → AGENTS.md (行为约束) → 三层架构路由 → Layer 3 项目层优先 → Layer 2 全局 fallback
 
-| 文件 | 职责 | 路径 |
-|------|------|------|
-| memory-routing.md | 记忆请求路由、作用域解析、降级策略 | `memory/kb/global/memory-routing.md` |
-| project-map/INDEX.md | 项目地图唯一合法入口、合法性校验 | `project-map/INDEX.md` |
-| BOUNDARY.md | 仓库边界定义、职责范围、不属于本仓库的内容 | `memory/docs/system/BOUNDARY.md` |
+| 层 | 职责 | 路径 |
+|----|------|------|
+| 全局知识库 (Layer 2) | 跨项目通用知识、全局 fallback | `~/.memory/global-kb/` |
+| 项目知识库 (Layer 3) | 项目专属知识 | `<project>/memory/kb/` |
 
-具体路由规则（如 scope resolution、fallback）请查阅上述文件，不要在此文件中寻找。
+具体路由规则（如 scope resolution、fallback）请查阅上述路径下的 INDEX.md。
 
 ## 文档分类规则
 

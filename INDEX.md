@@ -16,4 +16,4 @@
 
 ## 真相模型
 
-- 真相模型规范: `memory/kb/global/truth-model.md`
+

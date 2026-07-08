@@ -19,7 +19,7 @@ Scope: adapter
 
 ## Required Registry Scopes
 - `project-map/**`
-- `memory/kb/global/**`
+- `memory/system/kb/global/**`
 - `memory/kb/projects/**`
 - `memory/docs/**`
 - `memory/log/**`
