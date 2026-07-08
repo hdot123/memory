@@ -61,7 +61,8 @@ def build_default_runtime_profile(
     # Standard memory/ paths ─────────────────────────
     kb_root = project_root / "memory" / "kb"
     projects_root = kb_root / "projects"
-    global_root = kb_root / "global"
+    # System-level governance stubs (Layer 1 + Layer 3)
+    global_root = project_root / "memory" / "system" / "kb" / "global"
 
     # Project map lives at project_root / project-map/ (generic)
     project_map_root = project_root / "project-map"
@@ -168,7 +169,7 @@ def build_default_runtime_profile(
     ]
     required_registry_scopes: list[str] = [
         "project-map/**",
-        "memory/kb/global/**",
+        "memory/system/kb/global/**",
         "memory/kb/projects/**",
         "memory/docs/**",
         "memory/log/**",

@@ -418,7 +418,7 @@ def _build_config_from_init(tmp_path: Path):
     # After init, the structure is:
     # tmp_path/
     #   project-map/INDEX.md, legal-core-map.md, ingestion-registry-map.md
-    #   memory/kb/global/truth-model.md, memory-system.md, memory-routing.md, hook-contract.md, project-map-governance.md
+    #   memory/system/kb/global/ (system-level governance stubs)
     #   memory/docs/INDEX.md, 记忆系统全景文档.md
     #   tests/.memory-anchor.md
     #   tools/health-check.sh
@@ -431,7 +431,7 @@ def _build_config_from_init(tmp_path: Path):
     project_map_root = tmp_path / "project-map"
 
     # Ensure all required dirs exist (some may be created by init)
-    for d in ["memory/kb/global", "memory/kb/global/projects", "memory/kb/projects", "memory/docs",
+    for d in ["memory/system/kb/global", "memory/kb/projects", "memory/docs",
               "memory/log", "memory/system", "tools", "tests"]:
         (tmp_path / d).mkdir(parents=True, exist_ok=True)
 
@@ -441,11 +441,12 @@ def _build_config_from_init(tmp_path: Path):
     registry_map = project_map_root / "ingestion-registry-map.md"
     governance = project_map_root / "project-map-governance.md"
 
-    truth_model = tmp_path / "memory" / "kb" / "global" / "truth-model.md"
-    memory_system_path = tmp_path / "memory" / "kb" / "global" / "memory-system.md"
-    hook_contract_path = tmp_path / "memory" / "kb" / "global" / "hook-contract.md"
-    memory_routing = tmp_path / "memory" / "kb" / "global" / "memory-routing.md"
-    pm_governance = tmp_path / "memory" / "kb" / "global" / "project-map-governance.md"
+    # VAL-INIT-001: Governance stubs now at memory/system/kb/global/ (system-level)
+    truth_model = tmp_path / "memory" / "system" / "kb" / "global" / "truth-model.md"
+    memory_system_path = tmp_path / "memory" / "system" / "kb" / "global" / "memory-system.md"
+    hook_contract_path = tmp_path / "memory" / "system" / "kb" / "global" / "hook-contract.md"
+    memory_routing = tmp_path / "memory" / "system" / "kb" / "global" / "memory-routing.md"
+    pm_governance = tmp_path / "memory" / "system" / "kb" / "global" / "project-map-governance.md"
 
     global_canonical = [truth_model, memory_system_path, hook_contract_path, memory_routing, pm_governance]
 
@@ -471,7 +472,7 @@ def _build_config_from_init(tmp_path: Path):
         lower_evidence_roots=lower_evidence_roots,
         legal_core_markers=["active-legal", "project-map/INDEX.md", "truth-model.md", "memory-system.md"],
         required_registry_scopes=[
-            "project-map/**", "memory/kb/global/**", "memory/kb/projects/**",
+            "project-map/**", "memory/system/kb/global/**", "memory/kb/projects/**",
             "memory/docs/**", "memory/log/**", "memory_core/projects/**",
             "memory_core/tools/**", "tests/**",
         ],
@@ -495,7 +496,7 @@ def _build_config_from_init(tmp_path: Path):
         workspace_index_path=tmp_path / "INDEX.md",
         docs_index_path=tmp_path / "memory" / "docs" / "INDEX.md",
         overview_doc_path=tmp_path / "memory" / "docs" / "记忆系统全景文档.md",
-        global_index_path=tmp_path / "memory" / "kb" / "global" / "INDEX.md",
+        global_index_path=tmp_path / "memory" / "kb" / "INDEX.md",
         hook_contract_path=hook_contract_path,
         default_project_scope="test",
         scope_match_hints={},
@@ -532,7 +533,6 @@ class TestIngestionRegistryScopes:
         content = (tmp_path / "project-map" / "ingestion-registry-map.md").read_text(encoding="utf-8")
         required_scopes = [
             "project-map/**",
-            "memory/kb/global/**",
             "memory/kb/projects/**",
             "memory/docs/**",
             "memory/log/**",
@@ -542,6 +542,8 @@ class TestIngestionRegistryScopes:
         ]
         for scope in required_scopes:
             assert scope in content, f"Missing required_registry_scope: {scope}"
+        # VAL-INIT-001: memory/kb/global/** should NOT be in ingestion-registry-map
+        assert "memory/kb/global/**" not in content, "Stale scope memory/kb/global/** should be removed"
 
 
 class TestOverviewDocExists:
@@ -574,7 +576,7 @@ class TestTruthBasisTruthModel:
         config = _build_config_from_init(tmp_path)
         from memory_core.tools.business_policy_checks import TruthBasisResolver
         resolver = TruthBasisResolver(config)
-        file_path = config.repo_root / "memory" / "kb" / "global" / "truth-model.md"
+        file_path = config.repo_root / "memory" / "system" / "kb" / "global" / "truth-model.md"
         errors = resolver._truth_basis_errors_for(file_path)
         assert errors == [], f"Truth Basis errors in truth-model.md: {errors}"
 
@@ -592,7 +594,7 @@ class TestTruthBasisMemorySystem:
         config = _build_config_from_init(tmp_path)
         from memory_core.tools.business_policy_checks import TruthBasisResolver
         resolver = TruthBasisResolver(config)
-        file_path = config.repo_root / "memory" / "kb" / "global" / "memory-system.md"
+        file_path = config.repo_root / "memory" / "system" / "kb" / "global" / "memory-system.md"
         errors = resolver._truth_basis_errors_for(file_path)
         assert errors == [], f"Truth Basis errors in memory-system.md: {errors}"
 
@@ -610,7 +612,7 @@ class TestTruthBasisMemoryRouting:
         config = _build_config_from_init(tmp_path)
         from memory_core.tools.business_policy_checks import TruthBasisResolver
         resolver = TruthBasisResolver(config)
-        file_path = config.repo_root / "memory" / "kb" / "global" / "memory-routing.md"
+        file_path = config.repo_root / "memory" / "system" / "kb" / "global" / "memory-routing.md"
         errors = resolver._truth_basis_errors_for(file_path)
         assert errors == [], f"Truth Basis errors in memory-routing.md: {errors}"
 
@@ -628,7 +630,7 @@ class TestTruthBasisHookContract:
         config = _build_config_from_init(tmp_path)
         from memory_core.tools.business_policy_checks import TruthBasisResolver
         resolver = TruthBasisResolver(config)
-        file_path = config.repo_root / "memory" / "kb" / "global" / "hook-contract.md"
+        file_path = config.repo_root / "memory" / "system" / "kb" / "global" / "hook-contract.md"
         errors = resolver._truth_basis_errors_for(file_path)
         assert errors == [], f"Truth Basis errors in hook-contract.md: {errors}"
 
@@ -646,7 +648,7 @@ class TestTruthBasisProjectMapGovernance:
         config = _build_config_from_init(tmp_path)
         from memory_core.tools.business_policy_checks import TruthBasisResolver
         resolver = TruthBasisResolver(config)
-        file_path = config.repo_root / "memory" / "kb" / "global" / "project-map-governance.md"
+        file_path = config.repo_root / "memory" / "system" / "kb" / "global" / "project-map-governance.md"
         errors = resolver._truth_basis_errors_for(file_path)
         assert errors == [], f"Truth Basis errors in project-map-governance.md: {errors}"
 
@@ -1148,7 +1150,7 @@ class TestAuditManifestNoFalsePositives:
 
     def test_no_false_positives_on_canonical_paths(self, tmp_path: Path) -> None:
         """_check_manifest_includes_runtime does NOT report for memory/system/adapter.toml
-        or memory/kb/global/memory-system.md. Substring matching ("system" in path) is
+        or memory/system/kb/global/memory-system.md. Substring matching ("system" in path) is
         replaced with precise prefix matching."""
         from memory_core.tools.audit_project_layout import audit_project_layout
 
@@ -1157,7 +1159,7 @@ class TestAuditManifestNoFalsePositives:
             "schema_version": "integrity-manifest-v2",
             "entries": [
                 {"path": "/project/memory/system/adapter.toml", "rel_path": "memory/system/adapter.toml"},
-                {"path": "/project/memory/kb/global/memory-system.md", "rel_path": "memory/kb/global/memory-system.md"},
+                {"path": "/project/memory/system/kb/global/memory-system.md", "rel_path": "memory/system/kb/global/memory-system.md"},
             ],
         }
         (tmp_path / "memory" / "system" / "manifest.json").write_text(json.dumps(manifest))

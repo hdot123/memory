@@ -102,9 +102,9 @@ class TestBuildDefaultRuntimeProfile:
         profile = build_default_runtime_profile(tmp_path)
 
         assert profile["PROJECT_MAP_ROOT"] == tmp_path / "project-map"
-        assert profile["TRUTH_MODEL"] == tmp_path / "memory" / "kb" / "global" / "truth-model.md"
-        assert profile["MEMORY_SYSTEM_PATH"] == tmp_path / "memory" / "kb" / "global" / "memory-system.md"
-        assert profile["GLOBAL_RULE_PATH"] == tmp_path / "memory" / "kb" / "global" / "memory-routing.md"
+        assert profile["TRUTH_MODEL"] == tmp_path / "memory" / "system" / "kb" / "global" / "truth-model.md"
+        assert profile["MEMORY_SYSTEM_PATH"] == tmp_path / "memory" / "system" / "kb" / "global" / "memory-system.md"
+        assert profile["GLOBAL_RULE_PATH"] == tmp_path / "memory" / "system" / "kb" / "global" / "memory-routing.md"
         assert len(profile["PROJECT_MAP_FILES"]) == 3
 
     def test_policy_values_from_toml(self, tmp_path: Path) -> None:

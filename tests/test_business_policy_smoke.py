@@ -90,12 +90,12 @@ def config(tmp_path: Path) -> Any:
     project_map.mkdir(parents=True, exist_ok=True)
     workspace.mkdir(parents=True, exist_ok=True)
     for subdir in [
-        "memory", "memory/kb", "memory/kb/global",
-        "memory/kb/global/projects", "memory/kb/projects",
+        "memory", "memory/kb", "memory/system/kb/global",
+        "memory/kb/projects",
         "docs", "projects", "memory/artifacts", "tools",
         "memory/log", "memory/system",
     ]:
-        (workspace / subdir).mkdir(exist_ok=True)
+        (workspace / subdir).mkdir(parents=True, exist_ok=True)
     (repo / "app").mkdir(exist_ok=True)
     (repo / "agents").mkdir(exist_ok=True)
 
