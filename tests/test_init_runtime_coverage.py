@@ -258,7 +258,7 @@ class TestInitGeneratesRequiredCanonical:
             for d in would_create_dirs
         )
         assert has_system_global_dir, "memory/system/kb/global directory should be in would_create_dirs"
-        
+
         # Note: The actual files may not be created by init anymore, but the directory structure should exist
         # The runtime profile now points to memory/system/kb/global/ for these files
 
