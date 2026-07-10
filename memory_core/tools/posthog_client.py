@@ -100,7 +100,7 @@ class PostHogAnalytics:
             return
 
         # Load host (optional, defaults to PostHog US cloud)
-        host = os.environ.get("POSTHOG_HOST", "https://app.posthog.com").strip()
+        host = os.environ.get("POSTHOG_HOST", "https://us.posthog.com").strip()
 
         try:
             self._client = posthog.Posthog(
