@@ -5,9 +5,9 @@
 
 Usage:
     python session_end_logger.py \
-        --session-dir /Users/busiji/.factory/sessions/-Users-busiji-workbot \
+        --session-dir ~/.factory/sessions/-Users-busiji-workbot \
         --session-id 491c46e7-7261-4444-a423-bba08ce2e4fb \
-        --project-root /Users/busiji/workbot
+        --project-root ~/workbot
 
 或者从 stdin 读取 gateway payload:
     echo '{"session_id": "...", "session_dir": "...", "project_root": "..."}' | \
