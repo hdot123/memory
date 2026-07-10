@@ -11,3 +11,6 @@ paths = [
   '''conftest\.py$''',
   '''tests/.*''',
 ]
+regexes = [
+  '''phc_o963uzVAku9jd45B4tgV598LUu2oJQHKFBy3RKJtgAVs''',
+]
