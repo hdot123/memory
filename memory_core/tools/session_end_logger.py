@@ -19,7 +19,7 @@ import argparse
 import json
 import signal
 import sys
-from collections import deque
+from collections import Counter, deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -125,6 +125,154 @@ def _read_settings(settings_path: Path) -> dict[str, Any]:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
+
+
+def _extract_session_info_streaming(
+    jsonl_path: Path, settings: dict[str, Any], session_id: str
+) -> dict[str, Any] | None:
+    """从 JSONL 文件单遍流式提取 session 摘要信息。
+
+    与 _read_jsonl_lines + _extract_session_info 两步流程等价，
+    但不构建 lines 列表，内存占用恒定为 O(1)。
+
+    - last_assistant_message: collections.deque(maxlen=1)
+    - tool_calls: Counter 累加
+    - 对任意大小文件保证 tool_calls 统计完整性（全量遍历）
+    """
+    if not jsonl_path.exists():
+        return None
+
+    session_start: dict[str, Any] | None = None
+    first_user_message: dict[str, Any] | None = None
+    last_assistant_deque: deque[dict[str, Any]] = deque(maxlen=1)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    tool_calls: Counter[str] = Counter()
+    total_tool_calls = 0
+
+    try:
+        with jsonl_path.open("r", encoding="utf-8") as f:
+            for raw_line in f:
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                try:
+                    line = json.loads(raw_line)
+                except json.JSONDecodeError:
+                    continue
+
+                event_type = line.get("type")
+
+                # session_start
+                if event_type == "session_start":
+                    session_start = line
+                    ts = line.get("timestamp", "")
+                    if ts:
+                        try:
+                            start_time = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        except ValueError:
+                            pass
+
+                # message 事件
+                elif event_type == "message":
+                    msg = line.get("message", {})
+                    role = msg.get("role", "")
+                    content = msg.get("content", [])
+                    ts = line.get("timestamp", "")
+
+                    if ts:
+                        try:
+                            msg_time = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                            if end_time is None or msg_time > end_time:
+                                end_time = msg_time
+                        except ValueError:
+                            pass
+
+                    # 第一条 user message
+                    if role == "user" and first_user_message is None:
+                        first_user_message = msg
+
+                    # 最后一条 assistant message (deque maxlen=1)
+                    if role == "assistant":
+                        last_assistant_deque.append(msg)
+
+                        # 统计 tool_use (Counter 累加，全量遍历保证完整)
+                        if isinstance(content, list):
+                            for block in content:
+                                if isinstance(block, dict) and block.get("type") == "tool_use":
+                                    tool_name = block.get("name", "Unknown")
+                                    tool_calls[tool_name] += 1
+                                    total_tool_calls += 1
+
+    except (OSError, IOError):
+        return None
+
+    # 从 deque 取出 last_assistant_message
+    last_assistant_message = last_assistant_deque[0] if last_assistant_deque else None
+
+    # 计算时长
+    duration_seconds = 0
+    if start_time and end_time:
+        duration_seconds = int((end_time - start_time).total_seconds())
+
+    # 格式化时长
+    duration_str = _format_duration(duration_seconds)
+
+    # 提取用户意图预览（第一条 user message 的 text content，前 200 字符）
+    user_prompt_preview = ""
+    if first_user_message and isinstance(first_user_message.get("content"), list):
+        for block in first_user_message["content"]:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "")
+                # 去除 system-reminder
+                if "<system-reminder>" in text:
+                    text = text.split("</system-reminder>")[-1].strip()
+                user_prompt_preview = text[:200]
+                if len(text) > 200:
+                    user_prompt_preview += "..."
+                break
+
+    # 提取助手摘要预览（最后一条 assistant message 的 text content，前 300 字符）
+    assistant_summary_preview = ""
+    if last_assistant_message and isinstance(last_assistant_message.get("content"), list):
+        for block in last_assistant_message["content"]:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "")
+                assistant_summary_preview = text[:300]
+                if len(text) > 300:
+                    assistant_summary_preview += "..."
+                break
+
+    # token usage 从 settings.json
+    token_usage = settings.get("inclusiveTokenUsage", {})
+    if not token_usage:
+        token_usage = settings.get("tokenUsage", {})
+
+    input_tokens = token_usage.get("inputTokens", 0)
+    output_tokens = token_usage.get("outputTokens", 0)
+
+    # model 从 settings.json
+    model = settings.get("model", "unknown")
+
+    # title 从 session_start
+    title = ""
+    if session_start:
+        title = session_start.get("title", "") or session_start.get("sessionTitle", "")
+
+    return {
+        "session_id": session_id[:8],  # 取前 8 位
+        "full_session_id": session_id,
+        "title": title,
+        "model": model,
+        "duration": duration_str,
+        "duration_seconds": duration_seconds,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "tool_calls": dict(tool_calls),
+        "total_tool_calls": total_tool_calls,
+        "user_prompt_preview": user_prompt_preview,
+        "assistant_summary_preview": assistant_summary_preview,
+    }
 
 
 def _extract_session_info(
@@ -387,12 +535,11 @@ def main(argv: list[str] | None = None) -> int:
         # settings.json 路径（同目录下）
         settings_path = jsonl_path.parent / f"{session_id}.settings.json"
 
-        # 读取数据
-        lines = _read_jsonl_lines(jsonl_path)
+        # 读取 settings
         settings = _read_settings(settings_path)
 
-        # 提取信息
-        info = _extract_session_info(lines, settings, session_id)
+        # 流式提取信息（单遍遍历，O(1) 内存）
+        info = _extract_session_info_streaming(jsonl_path, settings, session_id)
         if info is None:
             return 0
 
