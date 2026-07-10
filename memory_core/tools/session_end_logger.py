@@ -19,6 +19,7 @@ import argparse
 import json
 import signal
 import sys
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -28,14 +29,6 @@ try:
     from memory_core.tools.error_logger import write_error_log
 except ImportError:
     write_error_log = None  # type: ignore[misc,assignment]
-
-# F5: 签名模块导入（ImportError 时静默跳过）
-try:
-    from memory_core.tools.memory_hook_integrity_keys import load_key
-    from memory_core.tools.memory_hook_integrity_manifest import sign_project_incremental
-except ImportError:
-    sign_project_incremental = None  # type: ignore[misc,assignment]
-    load_key = None  # type: ignore[misc,assignment]
 
 # 超时处理：整体超时 2s
 TIMEOUT_SECONDS = 2
@@ -95,10 +88,9 @@ def _read_jsonl_lines(jsonl_path: Path) -> list[dict[str, Any]]:
                         except json.JSONDecodeError:
                             continue
 
-            # 读取最后 100 行
+            # 读取最后 100 行（使用 deque 流式读取，内存占用恒定）
             with jsonl_path.open("r", encoding="utf-8") as f:
-                all_lines = f.readlines()
-                last_lines = all_lines[-100:]
+                last_lines = list(deque(f, maxlen=100))
 
             lines = first_lines
             for line in last_lines:
@@ -284,31 +276,11 @@ def _format_tool_calls(tool_calls: dict[str, int]) -> str:
     return " | ".join(parts)
 
 
-def _try_sign_file(project_root: Path, rel_path: str) -> None:
-    """F5: 尝试对指定文件进行增量签名，失败不阻塞主流程。"""
-    if sign_project_incremental is None or load_key is None:
-        return
-    try:
-        key = load_key()
-        if key is None:
-            return
-        sign_project_incremental(project_root, key, changed_paths=[rel_path])
-    except Exception as exc:
-        # 签名失败 warning 但不阻塞
-        try:
-            import logging
-            _logger = logging.getLogger(__name__)
-            _logger.warning("session_end_logger: sign_project_incremental failed: %s", exc)
-        except Exception:
-            pass
-
-
 def _write_daily_log(project_root: Path, info: dict[str, Any]) -> bool:
     """追加写入 daily log 文件。"""
     today = datetime.now().strftime("%Y-%m-%d")
     log_dir = project_root / "memory" / "log"
     log_path = log_dir / f"{today}-sessions.md"
-    rel_path = f"memory/log/{today}-sessions.md"
 
     # 确保目录存在
     try:
@@ -348,8 +320,6 @@ def _write_daily_log(project_root: Path, info: dict[str, Any]) -> bool:
     try:
         with log_path.open("a", encoding="utf-8") as f:
             f.write(content)
-        # F5: 写入成功后调用增量签名
-        _try_sign_file(project_root, rel_path)
         return True
     except OSError as e:
         if write_error_log is not None:
@@ -360,111 +330,6 @@ def _write_daily_log(project_root: Path, info: dict[str, Any]) -> bool:
                 f"failed to write session log: {log_path}",
             )
         return False
-
-
-def capture_candidates(
-    project_root: Path,
-    global_kb_root: Path,
-) -> list[dict[str, Any]]:
-    """
-    扫描项目 memory/kb/lessons/ 和 decisions/ 当日变更文件,复制到 pending/。
-
-    Auto-capture mechanism for session-end: scans project knowledge base for
-    files modified today and copies them to ~/.memory/global-kb/pending/ with
-    source metadata for later promotion.
-
-    Args:
-        project_root: Project root directory
-        global_kb_root: Global KB root directory (typically ~/.memory/global-kb)
-
-    Returns:
-        List of candidate dictionaries with source_file, source_project, captured_at
-
-    Implementation:
-        - Scans lessons/ and decisions/ for files modified today
-        - Copies to pending/ with metadata frontmatter
-        - Filename includes project name to avoid conflicts
-        - Only writes to pending/, never to formal categories (zero noise)
-    """
-    candidates: list[dict[str, Any]] = []
-    today = datetime.now().date()
-    captured_at = datetime.now().isoformat()
-
-    # Directories to scan
-    scan_dirs = [
-        project_root / "memory" / "kb" / "lessons",
-        project_root / "memory" / "kb" / "decisions",
-    ]
-
-    # Ensure pending/ exists
-    pending_dir = global_kb_root / "pending"
-    pending_dir.mkdir(parents=True, exist_ok=True)
-
-    for scan_dir in scan_dirs:
-        if not scan_dir.exists():
-            continue
-
-        # Scan for files modified today
-        for file_path in scan_dir.iterdir():
-            if not file_path.is_file():
-                continue
-
-            # Check modification time
-            try:
-                mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
-                if mtime.date() != today:
-                    continue
-            except (OSError, ValueError):
-                continue
-
-            # This file was modified today, capture it
-            try:
-                # Read original content
-                content = file_path.read_text(encoding="utf-8")
-
-                # Generate pending filename with project name to avoid conflicts
-                project_name = project_root.name
-                category = file_path.parent.name  # "lessons" or "decisions"
-                pending_filename = f"{project_name}_{category}_{file_path.name}"
-                pending_path = pending_dir / pending_filename
-
-                # Build metadata frontmatter
-                metadata_lines = [
-                    "---",
-                    f"source_project: {project_root}",
-                    f"source_file: {file_path.relative_to(project_root)}",
-                    f"captured_at: {captured_at}",
-                    "---",
-                    "",
-                ]
-
-                # Write to pending/ with metadata
-                with pending_path.open("w", encoding="utf-8") as f:
-                    f.write("\n".join(metadata_lines))
-                    f.write(content)
-
-                # Record candidate
-                candidates.append({
-                    "source_file": str(file_path.relative_to(project_root)),
-                    "source_project": str(project_root),
-                    "captured_at": captured_at,
-                    "pending_path": str(pending_path),
-                })
-
-            except (OSError, IOError) as e:
-                # Capture failed, log but don't block
-                if write_error_log is not None:
-                    write_error_log(
-                        str(project_root),
-                        "auto_capture_failed",
-                        {
-                            "source_file": str(file_path),
-                            "error": str(e),
-                        },
-                        f"Failed to capture candidate: {file_path}",
-                    )
-
-    return candidates
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -533,15 +398,6 @@ def main(argv: list[str] | None = None) -> int:
 
         # 写入日志
         _write_daily_log(project_root, info)
-
-        # 自动捕获: 扫描当日 lessons/decisions 变更到 pending/
-        try:
-            from memory_core.tools.global_kb_init import get_global_kb_root
-            global_kb_root = get_global_kb_root()
-            capture_candidates(project_root=project_root, global_kb_root=global_kb_root)
-        except Exception:
-            # 自动捕获失败不阻塞主流程
-            pass
 
         return 0
 

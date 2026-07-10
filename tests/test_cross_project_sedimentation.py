@@ -128,7 +128,7 @@ class TestVALCross003SedimentationFullFlow:
         self, project_a: Path, shared_global_kb: Path
     ):
         """Step 1: Auto-capture creates pending candidate from today's changes."""
-        from memory_core.tools.session_end_logger import capture_candidates
+        from memory_core.tools.auto_capture import capture_candidates
 
         # Create a lesson modified today
         today_ts = datetime.now().timestamp()
@@ -157,7 +157,7 @@ class TestVALCross003SedimentationFullFlow:
     ):
         """Step 2: Promote moves file from pending/ to formal category."""
         from memory_core.tools.promote_global_kb import main as promote_main
-        from memory_core.tools.session_end_logger import capture_candidates
+        from memory_core.tools.auto_capture import capture_candidates
 
         # Step 2a: Create and capture a lesson
         today_ts = datetime.now().timestamp()
@@ -198,7 +198,7 @@ class TestVALCross003SedimentationFullFlow:
         """Step 3: New project (B) can read promoted knowledge via fallback."""
         from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
-        from memory_core.tools.session_end_logger import capture_candidates
+        from memory_core.tools.auto_capture import capture_candidates
 
         # Step 3a: Project A produces and promotes knowledge
         today_ts = datetime.now().timestamp()
@@ -250,7 +250,7 @@ class TestVALCross003SedimentationFullFlow:
         )
         from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
-        from memory_core.tools.session_end_logger import capture_candidates
+        from memory_core.tools.auto_capture import capture_candidates
 
         # 1. Project A produces knowledge
         today_ts = datetime.now().timestamp()
@@ -331,7 +331,7 @@ class TestVALCross004MultiProjectSharing:
         """Project B should be able to read knowledge promoted by Project A."""
         from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
-        from memory_core.tools.session_end_logger import capture_candidates
+        from memory_core.tools.auto_capture import capture_candidates
 
         # Project A promotes knowledge to engineering/
         today_ts = datetime.now().timestamp()
@@ -378,7 +378,7 @@ class TestVALCross004MultiProjectSharing:
         """Multiple promoted files should all be accessible across projects."""
         from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
-        from memory_core.tools.session_end_logger import capture_candidates
+        from memory_core.tools.auto_capture import capture_candidates
 
         # Create multiple knowledge items
         today_ts = datetime.now().timestamp()
@@ -442,7 +442,7 @@ class TestVALCross004MultiProjectSharing:
         """Project-specific knowledge still takes priority over global KB."""
         from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
-        from memory_core.tools.session_end_logger import capture_candidates
+        from memory_core.tools.auto_capture import capture_candidates
 
         # Project A promotes SSH guide to global
         today_ts = datetime.now().timestamp()
