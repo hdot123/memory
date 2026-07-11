@@ -1767,10 +1767,12 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
         if not records:
             return
 
-        # Step 4: Batch send via telemetry_bridge
+        # Step 4: Batch send via telemetry_bridge.batch_capture
         try:
             from memory_core.tools.telemetry_bridge import telemetry
 
+            # Build events list
+            events = []
             for record in records:
                 event_name = str(record.get("event") or "memory.replayed_event")
                 properties = {
@@ -1780,7 +1782,10 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                     "original_host": record.get("host"),
                     "original_timestamp": record.get("timestamp"),
                 }
-                telemetry.safe_capture(event_name, properties)
+                events.append({"event_name": event_name, "properties": properties})
+
+            # Single batch HTTP call
+            telemetry.batch_capture(events)
 
             # Step 5: Success - update .offset and .last_sync
             offset_file.write_text(str(current_line), encoding="utf-8")

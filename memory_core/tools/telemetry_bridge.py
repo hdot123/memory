@@ -245,6 +245,86 @@ class TelemetryBridge:
             logger.debug("telemetry_bridge.replay_unsent failed: %s", exc)
             return 0
 
+    def batch_capture(
+        self,
+        events: list[dict[str, Any]],
+        cwd: Path | str | None = None,
+    ) -> None:
+        """Batch send multiple events to PostHog in a single HTTP request.
+
+        This method builds a batch payload and sends it directly to PostHog's
+        batch API endpoint, avoiding per-event SDK overhead.
+
+        Args:
+            events: List of event dicts with keys: event_name, properties
+            cwd: Optional working directory for project_id resolution
+
+        Fail-safe: never raises. No-op when analytics is disabled or network fails.
+        """
+        if not self._is_enabled() or self._analytics is None or not events:
+            return
+
+        try:
+            # Build batch payload
+            distinct_id = self.get_project_id(cwd)
+            batch_items = []
+
+            for event_data in events:
+                if not isinstance(event_data, dict):
+                    continue
+
+                event_name = str(event_data.get("event_name") or "memory.batched_event")
+                if not event_name.startswith("memory."):
+                    event_name = f"memory.{event_name}"
+
+                properties = event_data.get("properties") or {}
+                sanitized = _sanitize_properties(properties)
+
+                enriched: dict[str, Any] = {
+                    "memory_core_version": CURRENT_MEMORY_VERSION,
+                    "host": _resolve_host(),
+                    "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
+                    **sanitized,
+                }
+
+                batch_items.append({
+                    "event": event_name,
+                    "properties": enriched,
+                    "distinct_id": distinct_id,
+                })
+
+            if not batch_items:
+                return
+
+            # Direct HTTP POST to PostHog batch API using stdlib
+            import urllib.request
+            import urllib.error
+
+            client = self._analytics._client
+            host = os.environ.get("POSTHOG_HOST", "https://us.posthog.com").strip()
+            api_key = client.api_key
+
+            batch_url = f"{host}/batch/"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            payload = json.dumps({"batch": batch_items}).encode("utf-8")
+
+            req = urllib.request.Request(batch_url, data=payload, headers=headers, method="POST")
+
+            # 5s timeout for batch operation (network probe already done before calling this)
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status >= 400:
+                    logger.debug("telemetry_bridge.batch_capture: HTTP %d", response.status)
+                    return
+
+            logger.debug("telemetry_bridge.batch_capture: sent %d events", len(batch_items))
+
+        except Exception as exc:
+            # Analytics must never break the host application flow
+            logger.debug("telemetry_bridge.batch_capture failed: %s", exc)
+
     def flush(self) -> None:
         """Flush pending analytics events."""
         if self._analytics is None:
