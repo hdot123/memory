@@ -6,7 +6,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/signing-test-ci-310]
     paths:
       - 'memory_core/**'
       - 'tests/**'
