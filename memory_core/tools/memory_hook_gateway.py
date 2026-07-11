@@ -1700,9 +1700,10 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
     4. If probe fails, update .last_sync_attempt and exit
     5. If probe succeeds, read .offset sidecar and incremental records from metrics.jsonl
     6. Batch send via telemetry_bridge.batch_capture (passes all record fields)
-    7. On success: update .offset and .last_sync_success
+    7. On success: update .offset and .last_sync_success, compact metrics.jsonl
        On failure: update .last_sync_attempt (not .offset, retry next time)
-    8. All operations wrapped in try/except (exceptions never propagate)
+    8. Write .sync_status.json with lifecycle tracking fields
+    9. All operations wrapped in try/except (exceptions never propagate)
 
     Args:
         artifact_root: Path to the artifacts directory containing metrics.jsonl
@@ -1753,6 +1754,8 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                 last_sync_attempt_file.write_text(str(now), encoding="utf-8")
             except OSError:
                 pass
+            # Update sync_status.json with failure
+            _write_sync_status(artifact_root, False, 0)
             return
 
         # Step 4: Read offset and incremental records
@@ -1787,6 +1790,8 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
         if not records:
             return
 
+        pending_count = len(records)
+
         # Step 5: Batch send via telemetry_bridge.batch_capture
         try:
             from memory_core.tools.telemetry_bridge import telemetry
@@ -1805,12 +1810,43 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                 # Step 6: Success - update .offset and .last_sync_success
                 offset_file.write_text(str(current_line), encoding="utf-8")
                 last_sync_success_file.write_text(str(now), encoding="utf-8")
+
+                # Step 7: Compact metrics.jsonl after successful sync
+                # Read remaining lines after offset, rewrite file with lock, reset offset to 0
+                try:
+                    remaining_lines = []
+                    with metrics_file.open("r", encoding="utf-8") as f:
+                        line_num = 0
+                        for line in f:
+                            line_num += 1
+                            if line_num > current_line:
+                                remaining_lines.append(line)
+
+                    # Rewrite file with exclusive lock
+                    with metrics_file.open("w", encoding="utf-8") as f:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                        try:
+                            f.writelines(remaining_lines)
+                            f.flush()
+                            os.fsync(f.fileno())
+                        finally:
+                            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+                    # Reset offset to 0 after compaction
+                    offset_file.write_text("0", encoding="utf-8")
+                except OSError as exc:
+                    _logger.debug("metrics.jsonl compaction failed: %s", exc)
+
+                # Update sync_status.json with success
+                _write_sync_status(artifact_root, True, 0)
             else:
-                # Step 7: Send failed - update .last_sync_attempt (not .offset, retry next time)
+                # Step 8: Send failed - update .last_sync_attempt (not .offset, retry next time)
                 try:
                     last_sync_attempt_file.write_text(str(now), encoding="utf-8")
                 except OSError:
                     pass
+                # Update sync_status.json with failure
+                _write_sync_status(artifact_root, False, pending_count)
 
         except Exception as exc:
             # Send failed: update .last_sync_attempt (not .offset, retry next time)
@@ -1819,10 +1855,46 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                 last_sync_attempt_file.write_text(str(now), encoding="utf-8")
             except OSError:
                 pass
+            # Update sync_status.json with failure
+            _write_sync_status(artifact_root, False, pending_count)
 
     except Exception as exc:
         # Top-level catch: sync must never break gateway flow
         _logger.debug("_maybe_sync_telemetry failed: %s", exc)
+
+
+def _write_sync_status(artifact_root: Path, success: bool, pending_count: int) -> None:
+    """Write .sync_status.json with lifecycle tracking fields.
+
+    Args:
+        artifact_root: Path to the artifacts directory
+        success: Whether the sync succeeded
+        pending_count: Number of records waiting to be synced
+    """
+    status_file = artifact_root / ".sync_status.json"
+    now_iso = datetime.now().astimezone().isoformat(timespec="seconds")
+
+    # Read existing status
+    status: dict[str, Any] = {}
+    if status_file.exists():
+        try:
+            status = json.loads(status_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            status = {}
+
+    if success:
+        status["last_success_ts"] = now_iso
+        status["failure_count"] = 0
+    else:
+        status["last_failure_ts"] = now_iso
+        status["failure_count"] = int(status.get("failure_count", 0)) + 1
+
+    status["pending_count"] = pending_count
+
+    try:
+        status_file.write_text(json.dumps(status, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def main() -> int:
