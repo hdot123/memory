@@ -64,7 +64,7 @@ class TestSigningInvocationAtInit:
             result = init_project_memory(target, host="factory")
 
         assert result["success"], f"init failed: {result['errors']}"
-        assert mock_sign.call_count == 1
+        assert mock_sign.call_count == 1, f"sign not called. warnings: {result.get('warnings', [])}"
         # Verify it was called with changed_paths argument
         call_kwargs = mock_sign.call_args
         assert "changed_paths" in call_kwargs.kwargs or len(call_kwargs.args) >= 3
