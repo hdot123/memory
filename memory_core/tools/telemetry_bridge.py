@@ -182,74 +182,11 @@ class TelemetryBridge:
             # Analytics must never break the host application flow
             logger.debug("telemetry_bridge.safe_capture failed for '%s': %s", event_name, exc)
 
-    def replay_unsent(self, metrics_path: Path | str) -> int:
-        """Replay unsent metrics records from a JSONL file using a sidecar offset.
-
-        The sidecar offset file is ``<metrics_path>.offset`` and stores the number
-        of lines already processed. Records must contain a JSON-serializable
-        payload; each record is forwarded to ``safe_capture`` as
-        ``memory.replayed_event``.
-
-        Returns the number of records successfully replayed. Always fail-safe.
-        """
-        try:
-            path = Path(metrics_path).expanduser()
-            if not path.exists():
-                return 0
-
-            offset_path = path.with_suffix(path.suffix + ".offset")
-            last_offset = 0
-            if offset_path.exists():
-                try:
-                    last_offset = int(offset_path.read_text(encoding="utf-8").strip())
-                except (OSError, ValueError):
-                    last_offset = 0
-
-            replayed = 0
-            current_line = 0
-            with path.open("r", encoding="utf-8") as handle:
-                for line in handle:
-                    current_line += 1
-                    if current_line <= last_offset:
-                        continue
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if not isinstance(record, dict):
-                        continue
-                    if record.get("posthog_sent") is True:
-                        continue
-
-                    event_name = str(record.get("event") or "replayed_event")
-                    props = {
-                        "replayed_from": path.name,
-                        "original_status": record.get("status"),
-                        "original_event": record.get("event"),
-                        "original_host": record.get("host"),
-                        "original_timestamp": record.get("timestamp"),
-                    }
-                    self.safe_capture(event_name, props)
-                    replayed += 1
-
-            try:
-                offset_path.write_text(str(current_line), encoding="utf-8")
-            except OSError as exc:
-                logger.debug("telemetry_bridge: offset write failed: %s", exc)
-
-            return replayed
-        except Exception as exc:
-            logger.debug("telemetry_bridge.replay_unsent failed: %s", exc)
-            return 0
-
     def batch_capture(
         self,
         events: list[dict[str, Any]],
         cwd: Path | str | None = None,
-    ) -> None:
+    ) -> bool:
         """Batch send multiple events to PostHog in a single HTTP request.
 
         This method builds a batch payload and sends it directly to PostHog's
@@ -259,10 +196,13 @@ class TelemetryBridge:
             events: List of event dicts with keys: event_name, properties
             cwd: Optional working directory for project_id resolution
 
-        Fail-safe: never raises. No-op when analytics is disabled or network fails.
+        Returns:
+            True if batch send succeeded, False otherwise (HTTP error, exception, or client=None)
         """
-        if not self._is_enabled() or self._analytics is None or not events:
-            return
+        # Check client and enabled state first
+        client = self._analytics._client if self._analytics else None
+        if client is None or not self._is_enabled() or not events:
+            return False
 
         try:
             # Build batch payload
@@ -294,13 +234,12 @@ class TelemetryBridge:
                 })
 
             if not batch_items:
-                return
+                return False
 
             # Direct HTTP POST to PostHog batch API using stdlib
-            import urllib.request
             import urllib.error
+            import urllib.request
 
-            client = self._analytics._client
             host = os.environ.get("POSTHOG_HOST", "https://us.posthog.com").strip()
             api_key = client.api_key
 
@@ -317,13 +256,15 @@ class TelemetryBridge:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status >= 400:
                     logger.debug("telemetry_bridge.batch_capture: HTTP %d", response.status)
-                    return
+                    return False
 
             logger.debug("telemetry_bridge.batch_capture: sent %d events", len(batch_items))
+            return True
 
         except Exception as exc:
             # Analytics must never break the host application flow
             logger.debug("telemetry_bridge.batch_capture failed: %s", exc)
+            return False
 
     def flush(self) -> None:
         """Flush pending analytics events."""
