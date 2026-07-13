@@ -15,7 +15,16 @@ on:
       - 'ruff.toml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/release-and-dispatch.yml'
-  # pull_request is intentionally disabled — all code review happens on GitHub.
+  pull_request:
+    branches: [main]
+    paths:
+      - 'memory_core/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'ruff.toml'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/release-and-dispatch.yml'
 
 jobs:
   test:
