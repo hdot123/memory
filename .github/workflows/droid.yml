@@ -36,4 +36,4 @@ jobs:
         uses: Factory-AI/droid-action@main
         with:
           factory_api_key: ${{ secrets.FACTORY_API_KEY }}
-          model: "glm-5.2"
+          model: "claude-opus-4-8"
