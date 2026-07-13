@@ -30,3 +30,4 @@ jobs:
           automatic_review: true
           automatic_security_review: true
           review_model: "glm-5.2"
+          show_full_output: true
