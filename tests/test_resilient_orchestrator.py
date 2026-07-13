@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from memory_core.tools.prompt_validator import MAX_PROMPT_CHARS
 from memory_core.tools.resilient_orchestrator import ResilientOrchestrator
-from memory_core.tools.task_dispatcher import MAX_INLINE_CHARS, TaskDispatcher
+from memory_core.tools.task_dispatcher import TaskDispatcher
 
 
 class _MockDispatcher(TaskDispatcher):
