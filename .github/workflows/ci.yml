@@ -52,6 +52,8 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       - name: Health check (validate + pollution)
         run: bash scripts/ci_health_check.sh
+      - name: Full integration test
+        run: python scripts/test_full_integration.py
 
   advisory-security:
     name: Advisory dependency security scan
