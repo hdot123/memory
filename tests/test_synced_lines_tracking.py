@@ -9,8 +9,6 @@ import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from memory_core.tools import memory_hook_gateway as gw
 
 
