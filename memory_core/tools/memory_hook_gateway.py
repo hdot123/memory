@@ -1809,8 +1809,9 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
         try:
             from memory_core.tools.telemetry_bridge import telemetry
 
-            # Track the last successfully synced line number (not record count)
-            last_synced_line = offset
+            # Track both record count (for pending calculation) and line number (for offset/compaction)
+            synced_records = 0  # Number of records successfully sent
+            last_synced_line = offset  # Line number of last synced record
 
             for chunk_start in range(0, len(records_with_lines), BATCH_SIZE):
                 chunk = records_with_lines[chunk_start:chunk_start + BATCH_SIZE]
@@ -1823,11 +1824,14 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                 if not chunk_success:
                     break  # stop on first failure, retry next session
 
-                # Update offset to the line number of the last record in this chunk
-                last_synced_line = chunk[-1][0]
+                # Update both counters: record count for pending calculation, line number for offset
+                synced_records += len(chunk)
+                last_synced_line = chunk[-1][0]  # Line number of last record in chunk
                 offset_file.write_text(str(last_synced_line), encoding="utf-8")
 
-            all_synced = last_synced_line >= (records_with_lines[-1][0] if records_with_lines else offset)
+            # Check if all records were synced
+            # all_synced is True when synced_records equals total records to sync
+            all_synced = (synced_records == len(records_with_lines))
 
             if all_synced:
                 # Step 6: Success - update .last_sync_success
@@ -1858,8 +1862,8 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
 
                 _write_sync_status(artifact_root, True, 0)
             else:
-                # Partial success: offset already updated to last synced chunk
-                remaining = len(records_with_lines) - (chunk_start // BATCH_SIZE + 1) * BATCH_SIZE
+                # Partial success: calculate remaining using record count (not line numbers)
+                remaining = len(records_with_lines) - synced_records
                 last_sync_attempt_file.write_text(str(now), encoding="utf-8")
                 _write_sync_status(artifact_root, False, remaining)
 

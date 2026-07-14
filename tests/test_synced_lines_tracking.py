@@ -154,7 +154,7 @@ class TestSyncedLinesTracking:
 class TestNoDuplicateOnPartialFailure:
     """Test VAL-SYNC-002: partial failure does not cause duplicate telemetry."""
 
-    def test_partial_failure_no_duplicate(self, tmp_path, monkeypatch):
+    def test_partial_failure_no_duplicate(self, tmp_path):
         """After partial failure, retry only sends remaining records."""
         # File has 4 lines: 3 valid records, 1 blank
         # Line 1: record 1
@@ -180,9 +180,6 @@ class TestNoDuplicateOnPartialFailure:
             last_sync_success=time.time() - 7200,
         )
 
-        # Use small batch size to force multiple chunks
-        monkeypatch.setattr("memory_core.tools.memory_hook_gateway.BATCH_SIZE", 2)
-
         # First sync: chunk 1 succeeds, chunk 2 fails
         mock_telemetry = MagicMock()
         call_count = [0]
@@ -194,6 +191,7 @@ class TestNoDuplicateOnPartialFailure:
         mock_telemetry.batch_capture.side_effect = batch_capture_side_effect
 
         with patch("socket.create_connection"), \
+             patch.object(gw, "BATCH_SIZE", 2), \
              patch.dict("sys.modules", {"memory_core.tools.telemetry_bridge": MagicMock(telemetry=mock_telemetry)}):
             gw._maybe_sync_telemetry(artifact_root)
 
@@ -213,6 +211,7 @@ class TestNoDuplicateOnPartialFailure:
         mock_telemetry.batch_capture.return_value = True
 
         with patch("socket.create_connection"), \
+             patch.object(gw, "BATCH_SIZE", 2), \
              patch.dict("sys.modules", {"memory_core.tools.telemetry_bridge": MagicMock(telemetry=mock_telemetry)}):
             gw._maybe_sync_telemetry(artifact_root)
 
@@ -222,7 +221,7 @@ class TestNoDuplicateOnPartialFailure:
         event_names = [e["event_name"] for e in events_sent]
         assert event_names == ["ev3"], f"Expected only ['ev3'], got {event_names}"
 
-    def test_partial_failure_preserves_unsynced_records(self, tmp_path, monkeypatch):
+    def test_partial_failure_preserves_unsynced_records(self, tmp_path):
         """After partial failure, unsynced records are preserved for retry."""
         # Line 1: record 1
         # Line 2: blank
@@ -247,8 +246,6 @@ class TestNoDuplicateOnPartialFailure:
             last_sync_success=time.time() - 7200,
         )
 
-        monkeypatch.setattr("memory_core.tools.memory_hook_gateway.BATCH_SIZE", 2)
-
         # First sync: chunk 1 succeeds, chunk 2 fails
         mock_telemetry = MagicMock()
         call_count = [0]
@@ -260,6 +257,7 @@ class TestNoDuplicateOnPartialFailure:
         mock_telemetry.batch_capture.side_effect = batch_capture_side_effect
 
         with patch("socket.create_connection"), \
+             patch.object(gw, "BATCH_SIZE", 2), \
              patch.dict("sys.modules", {"memory_core.tools.telemetry_bridge": MagicMock(telemetry=mock_telemetry)}):
             gw._maybe_sync_telemetry(artifact_root)
 
@@ -274,6 +272,7 @@ class TestNoDuplicateOnPartialFailure:
         mock_telemetry.batch_capture.return_value = True
 
         with patch("socket.create_connection"), \
+             patch.object(gw, "BATCH_SIZE", 2), \
              patch.dict("sys.modules", {"memory_core.tools.telemetry_bridge": MagicMock(telemetry=mock_telemetry)}):
             gw._maybe_sync_telemetry(artifact_root)
 
