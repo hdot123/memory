@@ -33,6 +33,9 @@ except ImportError:
 REPO_ROOT, WORKSPACE_ROOT = discover_roots(Path.cwd())
 _FORCE_HOOK = bool(os.environ.get("MEMORY_HOOK_FORCE") or os.environ.get("WORKBOT_FORCE_HOOK"))
 
+# Batch size for telemetry sync
+BATCH_SIZE = 500
+
 
 def _configured_artifact_root(workspace_root: Path) -> Path:
     artifact_root = os.environ.get("MEMORY_HOOK_ARTIFACT_ROOT")
@@ -1778,8 +1781,9 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
             except (OSError, ValueError):
                 offset = 0
 
-        # Read incremental records
-        records = []
+        # Read incremental records with line numbers
+        # Track (line_number, record) tuples to handle blank/malformed lines correctly
+        records_with_lines = []
         current_line = 0
         with metrics_file.open("r", encoding="utf-8") as f:
             for line in f:
@@ -1792,26 +1796,26 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                 try:
                     record = json.loads(line)
                     if isinstance(record, dict):
-                        records.append(record)
+                        records_with_lines.append((current_line, record))
                 except json.JSONDecodeError:
                     continue
 
-        if not records:
+        if not records_with_lines:
             return
 
-        pending_count = len(records)
+        pending_count = len(records_with_lines)
 
         # Step 5: Batch send via telemetry_bridge.batch_capture (chunked)
         try:
             from memory_core.tools.telemetry_bridge import telemetry
 
-            BATCH_SIZE = 500
-            synced_lines = offset  # tracks how many lines from file start are synced
+            # Track the last successfully synced line number (not record count)
+            last_synced_line = offset
 
-            for chunk_start in range(0, len(records), BATCH_SIZE):
-                chunk = records[chunk_start:chunk_start + BATCH_SIZE]
+            for chunk_start in range(0, len(records_with_lines), BATCH_SIZE):
+                chunk = records_with_lines[chunk_start:chunk_start + BATCH_SIZE]
                 events = []
-                for record in chunk:
+                for line_num, record in chunk:
                     event_name = str(record.get("event") or "memory.replayed_event")
                     events.append({"event_name": event_name, "properties": {**record}})
 
@@ -1819,10 +1823,11 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                 if not chunk_success:
                     break  # stop on first failure, retry next session
 
-                synced_lines += len(chunk)
-                offset_file.write_text(str(synced_lines), encoding="utf-8")
+                # Update offset to the line number of the last record in this chunk
+                last_synced_line = chunk[-1][0]
+                offset_file.write_text(str(last_synced_line), encoding="utf-8")
 
-            all_synced = synced_lines >= offset + len(records)
+            all_synced = last_synced_line >= (records_with_lines[-1][0] if records_with_lines else offset)
 
             if all_synced:
                 # Step 6: Success - update .last_sync_success
@@ -1835,7 +1840,7 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                         line_num = 0
                         for line in f:
                             line_num += 1
-                            if line_num > synced_lines:
+                            if line_num > last_synced_line:
                                 remaining_lines.append(line)
 
                     with metrics_file.open("w", encoding="utf-8") as f:
@@ -1854,7 +1859,7 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                 _write_sync_status(artifact_root, True, 0)
             else:
                 # Partial success: offset already updated to last synced chunk
-                remaining = offset + len(records) - synced_lines
+                remaining = len(records_with_lines) - (chunk_start // BATCH_SIZE + 1) * BATCH_SIZE
                 last_sync_attempt_file.write_text(str(now), encoding="utf-8")
                 _write_sync_status(artifact_root, False, remaining)
 
