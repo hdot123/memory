@@ -157,8 +157,16 @@ check_gitlab_residue() {
   # - Python source files (may legitimately reference .gitlab-ci.yml for CI detection)
   # - Shell scripts (may contain patterns in conditionals or as tool definitions)
   # - Markdown docs in memory/docs/ (contain legitimate historical context about GitLab workflows)
-  local matches
-  matches="$(git ls-files | grep -v 'CHANGELOG\.md$' | grep -v '\.py$' | grep -v '\.sh$' | grep -v '^memory/docs/' | xargs rg -n "${patterns}" 2>/dev/null | grep -v ':[0-9]*:\s*#' || true)"
+  #
+  # Use grep instead of rg for portability: rg skips staged-but-uncommitted files
+  # by default, which breaks tests that git add without committing.
+  local file_list matches
+  file_list="$(git ls-files | grep -v 'CHANGELOG\.md$' | grep -v '\.py$' | grep -v '\.sh$' | grep -v '^memory/docs/' || true)"
+  
+  matches=""
+  if [[ -n "$file_list" ]]; then
+    matches="$(echo "$file_list" | tr '\n' '\0' | xargs -0 grep -n -E "${patterns}" 2>/dev/null | grep -v ':[0-9]*:\s*#' || true)"
+  fi
   
   local count=0
   if [[ -n "$matches" ]]; then
