@@ -81,9 +81,10 @@ def test_pending_logic():
     """Verify pending/not-found case logic in script."""
     content = SCRIPT_PATH.read_text()
 
-    # Verify pending/not-found case exits 1
+    # Verify pending/not-found case exits 1 after retries
     assert 'pending' in content
-    assert 'not yet complete' in content
+    assert 'MAX_ATTEMPTS' in content
+    assert 'not complete' in content
 
 
 def test_github_api_call_present():
