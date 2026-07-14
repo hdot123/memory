@@ -8,9 +8,9 @@ updates:
     labels:
       - dependencies
       - P2
-    # Minimum release age: wait 7 days before proposing new dependency versions
-    # to reduce supply-chain risk from compromised releases.
-    minimum-release-age: 7 days
+    # Dependabot does not support minimum-release-age natively.
+    # The weekly schedule controls update cadence.
+    # Manual review of PRs is required before merging.
     target-branch: main
 
   - package-ecosystem: github-actions
