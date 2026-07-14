@@ -43,8 +43,8 @@ class TestErrorCaptureEmission:
 
     def test_batch_capture_emits_error_on_failure(self, bridge_with_mock):
         bridge, mock = bridge_with_mock
-        # Force batch_capture to fail by making get_project_id raise
-        with patch.object(bridge, "get_project_id", side_effect=RuntimeError("id fail")):
+        # Force batch_capture to fail by making urllib.urlopen raise
+        with patch("urllib.request.urlopen", side_effect=OSError("network down")):
             result = bridge.batch_capture([{"event_name": "test", "properties": {}}])
 
         assert result is False
