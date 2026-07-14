@@ -5,7 +5,13 @@ by mocking the API responses and verifying the exit codes.
 """
 import json
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+# Use absolute paths based on repo root for CI compatibility
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_PATH = REPO_ROOT / "scripts" / "check_droid_review.sh"
+CI_YML_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def run_check_script(event_name, repository, commit_sha, mock_response, mock_status_code=200):
@@ -24,16 +30,14 @@ def run_check_script(event_name, repository, commit_sha, mock_response, mock_sta
 
 def test_script_exists():
     """Verify check_droid_review.sh exists."""
-    import os
-    script_path = "scripts/check_droid_review.sh"
-    assert os.path.exists(script_path), "check_droid_review.sh must exist"
+    assert SCRIPT_PATH.exists(), "check_droid_review.sh must exist"
     # Note: Execute permission not required - CI uses `bash scripts/check_droid_review.sh`
 
 
 def test_script_syntax_valid():
     """Verify the shell script has valid syntax."""
     result = subprocess.run(
-        ["bash", "-n", "scripts/check_droid_review.sh"],
+        ["bash", "-n", str(SCRIPT_PATH)],
         capture_output=True,
         text=True
     )
@@ -45,8 +49,7 @@ def test_push_event_skips_gracefully():
     # For push events, the script should exit 0 without checking
     # We can't easily test the bash script directly with mocks,
     # but we can verify the logic by inspection
-    with open("scripts/check_droid_review.sh", "r") as f:
-        content = f.read()
+    content = SCRIPT_PATH.read_text()
 
     # Verify the script has the skip logic
     assert 'if [ "$EVENT_NAME" != "pull_request" ]' in content
@@ -56,8 +59,7 @@ def test_push_event_skips_gracefully():
 
 def test_success_logic():
     """Verify success case logic in script."""
-    with open("scripts/check_droid_review.sh", "r") as f:
-        content = f.read()
+    content = SCRIPT_PATH.read_text()
 
     # Verify success case exits 0
     assert 'if [ "$STATUS" = "success" ]' in content
@@ -67,8 +69,7 @@ def test_success_logic():
 
 def test_failure_logic():
     """Verify failure case logic in script."""
-    with open("scripts/check_droid_review.sh", "r") as f:
-        content = f.read()
+    content = SCRIPT_PATH.read_text()
 
     # Verify failure case exits 1
     assert 'elif [ "$STATUS" = "failure" ]' in content
@@ -78,8 +79,7 @@ def test_failure_logic():
 
 def test_pending_logic():
     """Verify pending/not-found case logic in script."""
-    with open("scripts/check_droid_review.sh", "r") as f:
-        content = f.read()
+    content = SCRIPT_PATH.read_text()
 
     # Verify pending/not-found case exits 1
     assert 'pending' in content
@@ -88,8 +88,7 @@ def test_pending_logic():
 
 def test_github_api_call_present():
     """Verify the script calls GitHub API correctly."""
-    with open("scripts/check_droid_review.sh", "r") as f:
-        content = f.read()
+    content = SCRIPT_PATH.read_text()
 
     # Verify API call structure
     assert 'curl -s' in content
@@ -100,8 +99,7 @@ def test_github_api_call_present():
 
 def test_jq_extracts_conclusion():
     """Verify the script extracts conclusion from API response."""
-    with open("scripts/check_droid_review.sh", "r") as f:
-        content = f.read()
+    content = SCRIPT_PATH.read_text()
 
     # Verify jq usage
     assert 'jq -r' in content
@@ -110,9 +108,7 @@ def test_jq_extracts_conclusion():
 
 def test_ci_yml_calls_script():
     """Verify ci.yml calls check_droid_review.sh."""
-    with open(".github/workflows/ci.yml", "r") as f:
-        content = f.read()
+    content = CI_YML_PATH.read_text()
 
     # After implementation, ci.yml should reference the script
-    # This test will fail until we implement the fix
     assert 'check_droid_review.sh' in content or 'Check droid-review' in content
