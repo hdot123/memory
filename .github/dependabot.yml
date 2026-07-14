@@ -8,8 +8,9 @@ updates:
     labels:
       - dependencies
       - P2
-    # Dependabot does not support minimum-release-age natively.
-    # Supply-chain safety: review PRs promptly, wait before merging.
+    # Wait 7 days before proposing new dependency versions
+    # to reduce supply-chain risk from compromised releases
+    minimum-release-age: 7 days
     target-branch: main
 
   - package-ecosystem: github-actions
@@ -19,3 +20,4 @@ updates:
     labels:
       - dependencies
       - P2
+    minimum-release-age: 7 days
