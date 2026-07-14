@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import io
 import json
-import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -170,7 +169,7 @@ class TestPreToolUseEmitMetrics:
 
         # Mock subprocess.run to return our mock process
         # Patch emit_metrics at the module level where it's defined
-        with patch("subprocess.run", return_value=mock_proc) as mock_run, \
+        with patch("subprocess.run", return_value=mock_proc), \
              patch("memory_core.tools.memory_hook_metrics.emit_metrics", side_effect=capture_emit), \
              patch.object(memory_hook_gateway, "is_memory_core_source_repo", return_value=False), \
              patch.object(memory_hook_gateway, "is_denied_project_root", return_value=False), \
