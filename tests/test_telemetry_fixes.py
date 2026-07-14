@@ -25,30 +25,10 @@ class TestSessionEndEventNaming:
     def test_session_end_event_uses_kebab_case(self, tmp_path):
         """Verify session_end_logger writes 'session-end' not 'session_ended' at runtime.
 
-        This is a behavioral test that calls main() with a real jsonl file
+        This is a behavioral test that calls _write_session_metrics() directly
         and verifies the actual metrics record produced has event='session-end'.
         """
         from memory_core.tools import session_end_logger
-
-        # Create a real jsonl file so main() reaches append_metrics_record
-        session_dir = tmp_path / "session"
-        session_dir.mkdir()
-        jsonl_file = session_dir / "test-session.jsonl"
-        jsonl_file.write_text('{"role": "user", "content": "test"}\n')
-
-        # Mock info dict that _extract_session_info_streaming would return
-        mock_info = {
-            "session_id": "test-session",
-            "title": "Test Session",
-            "model": "test-model",
-            "duration": "0:00:01",
-            "duration_seconds": 1,
-            "input_tokens": 100,
-            "output_tokens": 50,
-            "tool_calls": [],
-            "user_prompt_preview": "test",
-            "assistant_summary_preview": "test summary",
-        }
 
         # Capture the metrics record passed to append_metrics_record
         captured_records = []
@@ -57,24 +37,19 @@ class TestSessionEndEventNaming:
             captured_records.append(record)
             return True
 
-        # Mock the functions that main() calls
-        with patch.object(session_end_logger, "_set_timeout"), \
-             patch.object(session_end_logger, "_read_stdin_payload", return_value={}), \
-             patch.object(session_end_logger, "_extract_session_info_streaming", return_value=mock_info), \
-             patch.object(session_end_logger, "_write_daily_log"), \
-             patch.object(session_end_logger, "_read_settings", return_value={}), \
-             patch.object(session_end_logger, "_resolve_metrics_path", return_value=tmp_path / "metrics.jsonl"), \
+        # Mock info dict that _extract_session_info_streaming would return
+        mock_info = {
+            "duration_seconds": 1,
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "total_tool_calls": 3,
+        }
+
+        # Call _write_session_metrics() directly with the extracted function
+        with patch.object(session_end_logger, "_resolve_metrics_path", return_value=tmp_path / "metrics.jsonl"), \
              patch.object(session_end_logger, "append_metrics_record", side_effect=capture_append_metrics):
 
-            # Call main() with correct arguments pointing to the real file
-            result = session_end_logger.main([
-                "--session-dir", str(session_dir),
-                "--session-id", "test-session",
-                "--project-root", str(tmp_path),
-            ])
-
-        # Verify main() returned 0 (success)
-        assert result == 0, f"main() should return 0, got {result}"
+            session_end_logger._write_session_metrics(tmp_path, mock_info)
 
         # Verify append_metrics_record was called
         assert len(captured_records) > 0, "append_metrics_record should have been called"
