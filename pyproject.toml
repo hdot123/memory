@@ -83,11 +83,48 @@ ignore_missing_imports = true
 exclude = ["workspace", "templates", "memory_core/workspace"]
 
 [tool.deptry]
-exclude = ["tests", ".venv", "venv", "build", "dist", "memory_core.egg-info", "memory_core/workspace", "workspace"]
+ignore = [
+    "tomllib",  # stdlib in Python 3.11+, conditional import with tomli fallback
+    "yaml",
+]
+exclude = [
+    "tests",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    "build",
+    "dist",
+    "memory_core.egg-info",
+    "memory_core/workspace",
+    "workspace",
+]
 
 [tool.deptry.per_rule_ignores]
-DEP001 = ["memory_hook_adapters", "memory_hook_config", "memory_hook_core", "memory_hook_impls", "memory_hook_interfaces", "memory_hook_schema", "memory_hook_integrity_manifest", "cmux_hook_state", "_validation_constants", "yaml", "memory_hook_gateway"]
-DEP002 = ["pytest-cov", "mypy", "requests", "pytest-rerunfailures", "pip-tools", "deptry", "vulture"]
+DEP001 = [
+    "memory_hook_adapters",
+    "memory_hook_config",
+    "memory_hook_core",
+    "memory_hook_impls",
+    "memory_hook_interfaces",
+    "memory_hook_schema",
+    "memory_hook_integrity_manifest",
+    "cmux_hook_state",
+    "_validation_constants",
+    "yaml",
+    "memory_hook_gateway",
+]
+DEP002 = [
+    "pytest-cov",
+    "mypy",
+    "requests",
+    "pytest-rerunfailures",
+    "pip-tools",
+    "deptry",
+    "vulture",
+]
 DEP003 = ["yaml"]
 
 
