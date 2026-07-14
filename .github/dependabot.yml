@@ -9,8 +9,7 @@ updates:
       - dependencies
       - P2
     # Dependabot does not support minimum-release-age natively.
-    # The weekly schedule controls update cadence.
-    # Manual review of PRs is required before merging.
+    # Supply-chain safety: review PRs promptly, wait before merging.
     target-branch: main
 
   - package-ecosystem: github-actions
