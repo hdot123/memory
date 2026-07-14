@@ -59,30 +59,31 @@ class TestSessionEndEventNaming:
         ), patch.object(
             session_end_logger,
             "_set_timeout",
+        ), patch.object(
+            session_end_logger,
+            "_read_stdin_payload",
+            return_value={},
         ):
-            # Call main with minimal args
-            test_args = [
-                "session_end_logger.py",
-                "--session-dir", "/tmp/test-session",
-                "--session-id", "test-session-123",
-                "--project-root", "/tmp/test-project",
-            ]
+            # Create dummy session dir and jsonl file for the test
+            session_dir = Path("/tmp/test-session")
+            session_dir.mkdir(parents=True, exist_ok=True)
+            jsonl_path = session_dir / "test-session-123.jsonl"
+            jsonl_path.write_text("{}\n")
 
-            with patch.object(sys, "argv", test_args):
-                # Create dummy session dir and jsonl file for the test
-                session_dir = Path("/tmp/test-session")
-                session_dir.mkdir(parents=True, exist_ok=True)
-                jsonl_path = session_dir / "test-session-123.jsonl"
-                jsonl_path.write_text("{}\n")
-
-                try:
-                    session_end_logger.main()
-                finally:
-                    # Cleanup
-                    if jsonl_path.exists():
-                        jsonl_path.unlink()
-                    if session_dir.exists():
-                        session_dir.rmdir()
+            try:
+                # Pass argv directly to main() instead of patching sys.argv
+                test_argv = [
+                    "--session-dir", "/tmp/test-session",
+                    "--session-id", "test-session-123",
+                    "--project-root", "/tmp/test-project",
+                ]
+                session_end_logger.main(test_argv)
+            finally:
+                # Cleanup
+                if jsonl_path.exists():
+                    jsonl_path.unlink()
+                if session_dir.exists():
+                    session_dir.rmdir()
 
         # Verify append_metrics_record was called
         assert len(captured_records) > 0, "append_metrics_record should have been called"
