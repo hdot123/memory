@@ -115,6 +115,7 @@ DEP001 = [
     "_validation_constants",
     "yaml",
     "memory_hook_gateway",
+    "tomllib",
 ]
 DEP002 = [
     "pytest-cov",
