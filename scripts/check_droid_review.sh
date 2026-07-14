@@ -12,7 +12,7 @@ COMMIT_SHA="${3}"
 GH_TOKEN="${4}"
 
 # Retry configuration
-MAX_ATTEMPTS=12
+MAX_ATTEMPTS=20
 WAIT_SECONDS=30
 
 # For push events (not pull_request), skip gracefully
