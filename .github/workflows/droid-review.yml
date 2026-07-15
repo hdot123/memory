@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 1
       - name: Write BYOK settings file
         env:
-          BAILIAN_KONG_PROXY_KEY: ${{ secrets.BAILIAN_KONG_PROXY_KEY }}
+          NVIDIA_KONG_PROXY_KEY: ${{ secrets.NVIDIA_KONG_PROXY_KEY }}
         run: |
           python3 -c "
           import json, os
@@ -39,7 +39,7 @@ jobs:
                   'model': 'qwen3.7-plus',
                   'displayName': 'Bailian Qwen 3.7 Plus',
                   'baseUrl': 'https://ai.exa.edu.kg/v1',
-                  'apiKey': os.environ['BAILIAN_KONG_PROXY_KEY'],
+                  'apiKey': os.environ['NVIDIA_KONG_PROXY_KEY'],
                   'provider': 'generic-chat-completion-api',
                   'maxOutputTokens': 65536,
                   'noImageSupport': True
