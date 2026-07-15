@@ -33,23 +33,8 @@ jobs:
           BAILIAN_KONG_PROXY_KEY: ${{ secrets.BAILIAN_KONG_PROXY_KEY }}
         run: |
           mkdir -p ${{ runner.temp }}/droid-settings
-          cat > ${{ runner.temp }}/droid-settings/settings.json << 'EOF'
-          {
-            "customModels": [
-              {
-                "model": "qwen3.7-plus",
-                "displayName": "Bailian Qwen 3.7 Plus",
-                "baseUrl": "https://ai.exa.edu.kg/v1",
-                "apiKey": "__BAILIAN_KEY__",
-                "provider": "generic-chat-completion-api",
-                "maxOutputTokens": 65536,
-                "noImageSupport": true
-              }
-            ]
-          }
-          EOF
-          sed -i "s|__BAILIAN_KEY__|${BAILIAN_KONG_PROXY_KEY}|g" ${{ runner.temp }}/droid-settings/settings.json
-          echo "Settings file written"
+          printf '%s' '{"customModels":[{"model":"qwen3.7-plus","displayName":"Bailian Qwen 3.7 Plus","baseUrl":"https://ai.exa.edu.kg/v1","apiKey":"'"${BAILIAN_KONG_PROXY_KEY}"'","provider":"generic-chat-completion-api","maxOutputTokens":65536,"noImageSupport":true}]}' > ${{ runner.temp }}/droid-settings/settings.json
+          cat ${{ runner.temp }}/droid-settings/settings.json | python3 -m json.tool > /dev/null && echo "Valid JSON written" || echo "ERROR: Invalid JSON"
       - name: Run Droid Auto Review
         uses: Factory-AI/droid-action@7c7bfea2aa3bb7ea87579402cc1d89dbcf6b13b3
         with:
