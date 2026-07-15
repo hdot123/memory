@@ -32,9 +32,25 @@ jobs:
         env:
           BAILIAN_KONG_PROXY_KEY: ${{ secrets.BAILIAN_KONG_PROXY_KEY }}
         run: |
-          mkdir -p ${{ runner.temp }}/droid-settings
-          printf '%s' '{"customModels":[{"model":"qwen3.7-plus","displayName":"Bailian Qwen 3.7 Plus","baseUrl":"https://ai.exa.edu.kg/v1","apiKey":"'"${BAILIAN_KONG_PROXY_KEY}"'","provider":"generic-chat-completion-api","maxOutputTokens":65536,"noImageSupport":true}]}' > ${{ runner.temp }}/droid-settings/settings.json
-          cat ${{ runner.temp }}/droid-settings/settings.json | python3 -m json.tool > /dev/null && echo "Valid JSON written" || echo "ERROR: Invalid JSON"
+          python3 -c "
+          import json, os
+          settings = {
+              'customModels': [{
+                  'model': 'qwen3.7-plus',
+                  'displayName': 'Bailian Qwen 3.7 Plus',
+                  'baseUrl': 'https://ai.exa.edu.kg/v1',
+                  'apiKey': os.environ['BAILIAN_KONG_PROXY_KEY'],
+                  'provider': 'generic-chat-completion-api',
+                  'maxOutputTokens': 65536,
+                  'noImageSupport': True
+              }]
+          }
+          path = '${{ runner.temp }}/droid-settings/settings.json'
+          os.makedirs(os.path.dirname(path), exist_ok=True)
+          with open(path, 'w') as f:
+              json.dump(settings, f)
+          print('Valid JSON written to', path)
+          "
       - name: Run Droid Auto Review
         uses: Factory-AI/droid-action@7c7bfea2aa3bb7ea87579402cc1d89dbcf6b13b3
         with:
