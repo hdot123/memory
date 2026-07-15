@@ -45,8 +45,8 @@ jobs:
                   'noImageSupport': True
               }]
           }
-          path = '${{ runner.temp }}/droid-settings/settings.json'
-          os.makedirs(os.path.dirname(path), exist_ok=True)
+          os.makedirs(os.path.expanduser('~/.factory'), exist_ok=True)
+          path = os.path.expanduser('~/.factory/settings.json')
           with open(path, 'w') as f:
               json.dump(settings, f)
           print('Valid JSON written to', path)
@@ -59,4 +59,3 @@ jobs:
           automatic_security_review: true
           review_model: "qwen3.7-plus"
           allowed_bots: "dependabot[bot]"
-          settings: ${{ runner.temp }}/droid-settings/settings.json
