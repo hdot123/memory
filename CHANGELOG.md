@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.1] - 2026-07-15
+
+### Verified
+- **droid-review 门禁验证通过**: NVIDIA Kong 代理 BYOK + glm-5.2 审查全绿，PR #132 验证通过后确认服务恢复
+- **VAL-CROSS-001 断言验证**: 确认 droid-review + ci-ok 双门禁全链路正常
+
 ## [0.9.0] - 2026-07-14
 
 ### Added
