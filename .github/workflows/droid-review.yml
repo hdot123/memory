@@ -23,10 +23,31 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
+      
+      - name: Configure BYOK for NVIDIA NIM
+        run: |
+          mkdir -p ~/.factory
+          cat > ~/.factory/settings.json << EOF
+          {
+            "customModels": [
+              {
+                "model": "nvidia/nemotron-3-super-120b-a12b",
+                "displayName": "NVIDIA Nemotron (BYOK Test)",
+                "baseUrl": "https://integrate.api.nvidia.com/v1",
+                "apiKey": "${NVIDIA_NIM_API_KEY}",
+                "provider": "generic-chat-completion-api",
+                "maxOutputTokens": 8192
+              }
+            ]
+          }
+          EOF
+        env:
+          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+      
       - name: Run Droid Auto Review
         uses: Factory-AI/droid-action@7c7bfea2aa3bb7ea87579402cc1d89dbcf6b13b3
         with:
           factory_api_key: ${{ secrets.FACTORY_API_KEY }}
           automatic_review: true
           automatic_security_review: true
-          review_model: "glm-5.2"
+          review_model: "nvidia/nemotron-3-super-120b-a12b"
