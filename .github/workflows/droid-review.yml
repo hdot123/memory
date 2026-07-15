@@ -1,7 +1,7 @@
 # Droid Auto Review Workflow
 # Uses Bailian (Qwen 3.7 Plus) via Kong Proxy BYOK configuration
 # Kong Proxy at ai.exa.edu.kg routes qwen3.7-plus to node1 via Tailscale
-# Review typically takes 3-5 minutes. Timeout set to 30 minutes in check_droid_review.sh
+# BYOK passed via droid-action `settings` input (official method)
 
 name: Droid Auto Review
 
@@ -28,27 +28,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
-      - name: Configure BYOK for Bailian via Kong Proxy
-        env:
-          BAILIAN_KONG_PROXY_KEY: ${{ secrets.BAILIAN_KONG_PROXY_KEY }}
-        run: |
-          mkdir -p ~/.factory
-          cat > ~/.factory/settings.json << SETTINGS_EOF
-          {
-            "customModels": [
-              {
-                "model": "qwen3.7-plus",
-                "displayName": "Bailian Qwen 3.7 Plus",
-                "baseUrl": "https://ai.exa.edu.kg/v1",
-                "apiKey": "${BAILIAN_KONG_PROXY_KEY}",
-                "provider": "generic-chat-completion-api",
-                "maxOutputTokens": 65536,
-                "noImageSupport": true
-              }
-            ]
-          }
-          SETTINGS_EOF
-          echo "BYOK settings.json written successfully"
       - name: Run Droid Auto Review
         uses: Factory-AI/droid-action@7c7bfea2aa3bb7ea87579402cc1d89dbcf6b13b3
         with:
@@ -57,3 +36,4 @@ jobs:
           automatic_security_review: true
           review_model: "qwen3.7-plus"
           allowed_bots: "dependabot[bot]"
+          settings: '{"customModels":[{"model":"qwen3.7-plus","displayName":"Bailian Qwen 3.7 Plus","baseUrl":"https://ai.exa.edu.kg/v1","apiKey":"${{ secrets.BAILIAN_KONG_PROXY_KEY }}","provider":"generic-chat-completion-api","maxOutputTokens":65536,"noImageSupport":true}]}'
