@@ -545,10 +545,6 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def now_iso() -> str:
-    return datetime.now().astimezone().isoformat(timespec="seconds")
-
-
 def _read_payload(raw_payload: str) -> dict[str, Any]:
     if not raw_payload.strip():
         return {}

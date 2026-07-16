@@ -5,13 +5,12 @@ import json
 import os
 import tempfile
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from ._file_utils import exclusive_lock
+    from ._file_utils import exclusive_lock, now_iso
 except ImportError:
-    from _file_utils import exclusive_lock  # type: ignore[import-not-found]
+    from _file_utils import exclusive_lock, now_iso  # type: ignore[import-not-found]
 
 
 class HookStateError(RuntimeError):
@@ -205,7 +204,7 @@ def record_hook_event(
             surface_state = _default_surface_state(workspace_ref, surface_ref)
             surfaces[surface_ref] = surface_state
 
-        now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        now = now_iso()
         surface_state["workspace_ref"] = workspace_ref
         surface_state["surface_ref"] = surface_ref
         surface_state["last_event"] = event_name
