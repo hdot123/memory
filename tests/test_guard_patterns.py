@@ -1,5 +1,4 @@
 """Unit tests for _guard_patterns.py extracted module."""
-import pytest
 from memory_core.tools._guard_patterns import (
     FORBIDDEN_DIRS,
     FORBIDDEN_SUFFIXES,

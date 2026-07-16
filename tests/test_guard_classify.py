@@ -3,9 +3,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
-
-import pytest
 
 from memory_core.tools._guard_classify import (
     _check_file_type_block,
@@ -416,20 +413,20 @@ class TestClassifyToolUse:
         """classify_tool_use matches _classify_tool_use for Write tool."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
         payload = {"tool_name": "Write", "file_path": "test.py", "content": "print('test')"}
-        
+
         result_new = classify_tool_use(payload.copy(), tmp_path)
         result_old = _classify_tool_use(payload.copy(), tmp_path)
-        
+
         assert result_new == result_old
 
     def test_matches_original_behavior_for_execute(self, tmp_path: Path):
         """classify_tool_use matches _classify_tool_use for Execute tool."""
         (tmp_path / "memory" / "system").mkdir(parents=True)
         payload = {"tool_name": "Execute", "command": "ls -la"}
-        
+
         result_new = classify_tool_use(payload.copy(), tmp_path)
         result_old = _classify_tool_use(payload.copy(), tmp_path)
-        
+
         assert result_new == result_old
 
     def test_matches_original_behavior_for_multiedit(self, tmp_path: Path):
@@ -441,10 +438,10 @@ class TestClassifyToolUse:
                 {"file_path": "test.py", "old_str": "old", "new_str": "new"},
             ]
         }
-        
+
         result_new = classify_tool_use(payload.copy(), tmp_path)
         result_old = _classify_tool_use(payload.copy(), tmp_path)
-        
+
         assert result_new == result_old
 
     def test_handles_tool_input_wrapper(self, tmp_path: Path):
