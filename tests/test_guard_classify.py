@@ -14,8 +14,8 @@ from memory_core.tools._guard_classify import (
     _parse_task_paths,
     _split_shell_args,
     classify_tool_use,
+    classify_tool_use as _classify_tool_use,
 )
-from memory_core.tools.pretooluse_guard import _classify_tool_use
 
 
 class TestCheckFileTypeBlock:
