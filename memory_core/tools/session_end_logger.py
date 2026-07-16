@@ -21,6 +21,9 @@ import signal
 import sys
 from collections import Counter, deque
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 # Import now_iso utility (REF-001 §4.8)
 try:
     from ._file_utils import now_iso
