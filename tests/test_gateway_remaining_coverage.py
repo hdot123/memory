@@ -1340,7 +1340,8 @@ class TestTruthBasisSectionsFor:
 ### Conflict Status
 - resolved
 """)
-        result = gw._truth_basis_sections_for(test_file)
+        content = test_file.read_text()
+        result = gw._truth_basis_sections_for(test_file, content)
         assert isinstance(result, dict)
         assert "source_refs" in result
         assert "authority_refs" in result
@@ -1354,7 +1355,7 @@ class TestTruthBasisErrorsFor:
     def test_truth_basis_errors_for_missing_file(self, gw, tmp_path):
         """_truth_basis_errors_for returns errors for missing file."""
         test_file = tmp_path / "nonexistent.md"
-        result = gw._truth_basis_errors_for(test_file)
+        result = gw._truth_basis_errors_for(test_file, None)
         assert len(result) > 0
         assert "missing" in result[0].lower()
 
@@ -1374,7 +1375,8 @@ class TestTruthBasisErrorsFor:
 ### Conflict Status
 - resolved
 """)
-        result = gw._truth_basis_errors_for(test_file)
+        content = test_file.read_text()
+        result = gw._truth_basis_errors_for(test_file, content)
         assert isinstance(result, list)
 
 

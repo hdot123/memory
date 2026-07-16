@@ -413,23 +413,21 @@ class TruthBasisResolver:
     def _lower_evidence_ref(self, path: Path) -> bool:
         return any(_path_is_under(path, root) for root in self._config.lower_evidence_roots)
 
-    def _truth_basis_sections_for(self, path: Path) -> dict[str, Any]:
-        text = path.read_text(encoding="utf-8")
+    def _truth_basis_sections_for(self, path: Path, content: str) -> dict[str, Any]:
         return {
-            "source_refs": _section_bullets(text, "### Source Refs"),
-            "authority_refs": _section_bullets(text, "### Authority Refs"),
-            "evidence_refs": _section_bullets(text, "### Evidence Refs"),
-            "conflict_status": _section_bullets(text, "### Conflict Status"),
+            "source_refs": _section_bullets(content, "### Source Refs"),
+            "authority_refs": _section_bullets(content, "### Authority Refs"),
+            "evidence_refs": _section_bullets(content, "### Evidence Refs"),
+            "conflict_status": _section_bullets(content, "### Conflict Status"),
         }
 
-    def _truth_basis_errors_for(self, path: Path) -> list[str]:
+    def _truth_basis_errors_for(self, path: Path, content: str | None) -> list[str]:
         errors: list[str] = []
-        if not path.exists():
+        if content is None:
             return [f"missing truth canonical: {path}"]
-        text = path.read_text(encoding="utf-8")
-        if "Truth Basis" not in text:
+        if "Truth Basis" not in content:
             return [f"truth basis section missing: {path}"]
-        sections = self._truth_basis_sections_for(path)
+        sections = self._truth_basis_sections_for(path, content)
         source_refs = sections["source_refs"]
         authority_refs = sections["authority_refs"]
         evidence_refs = sections["evidence_refs"]
@@ -504,14 +502,23 @@ class TruthBasisResolver:
         truth_basis_refs = [str(path) for path in self._config.global_canonical] + [str(project_file)]
         errors: list[str] = []
         for path in self._config.global_canonical:
-            errors.extend(self._truth_basis_errors_for(path))
-        project_sections = self._truth_basis_sections_for(project_file) if project_file.exists() else {
-            "source_refs": [],
-            "authority_refs": [],
-            "evidence_refs": [],
-            "conflict_status": [],
-        }
-        errors.extend(self._truth_basis_errors_for(project_file))
+            if not path.exists():
+                errors.append(f"missing truth canonical: {path}")
+                continue
+            content = path.read_text(encoding="utf-8")
+            errors.extend(self._truth_basis_errors_for(path, content))
+        if project_file.exists():
+            project_content = project_file.read_text(encoding="utf-8")
+            project_sections = self._truth_basis_sections_for(project_file, project_content)
+            errors.extend(self._truth_basis_errors_for(project_file, project_content))
+        else:
+            project_sections = {
+                "source_refs": [],
+                "authority_refs": [],
+                "evidence_refs": [],
+                "conflict_status": [],
+            }
+            errors.append(f"missing truth canonical: {project_file}")
         return {
             "policy": "source-authority-evidence-conflict",
             "refs": truth_basis_refs,

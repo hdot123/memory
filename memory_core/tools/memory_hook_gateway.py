@@ -716,24 +716,22 @@ def _lower_evidence_ref(path: Path) -> bool:
     return any(_path_is_under(path, root) for root in LOWER_EVIDENCE_ROOTS)
 
 
-def _truth_basis_sections_for(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8")
+def _truth_basis_sections_for(path: Path, content: str) -> dict[str, Any]:
     return {
-        "source_refs": _section_bullets(text, "### Source Refs"),
-        "authority_refs": _section_bullets(text, "### Authority Refs"),
-        "evidence_refs": _section_bullets(text, "### Evidence Refs"),
-        "conflict_status": _section_bullets(text, "### Conflict Status"),
+        "source_refs": _section_bullets(content, "### Source Refs"),
+        "authority_refs": _section_bullets(content, "### Authority Refs"),
+        "evidence_refs": _section_bullets(content, "### Evidence Refs"),
+        "conflict_status": _section_bullets(content, "### Conflict Status"),
     }
 
 
-def _truth_basis_errors_for(path: Path) -> list[str]:
+def _truth_basis_errors_for(path: Path, content: str) -> list[str]:
     errors: list[str] = []
-    if not path.exists():
+    if content is None:
         return [f"missing truth canonical: {path}"]
-    text = path.read_text(encoding="utf-8")
-    if "Truth Basis" not in text:
+    if "Truth Basis" not in content:
         return [f"truth basis section missing: {path}"]
-    sections = _truth_basis_sections_for(path)
+    sections = _truth_basis_sections_for(path, content)
     source_refs = sections["source_refs"]
     authority_refs = sections["authority_refs"]
     evidence_refs = sections["evidence_refs"]
