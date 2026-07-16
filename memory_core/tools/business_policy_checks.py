@@ -363,6 +363,10 @@ class TruthBasisResolver:
     def __init__(self, config: GatewayBusinessPolicyConfig):
         self._config = config
 
+    def _read_text_if_exists(self, path: Path) -> str:
+        """Read file content via injected callback (I/O separated from rule logic)."""
+        return self._config.read_text_if_exists_fn(path)
+
     # -- scope helpers --
 
     def get_project_canonical(self) -> dict[str, Path]:
@@ -502,13 +506,13 @@ class TruthBasisResolver:
         truth_basis_refs = [str(path) for path in self._config.global_canonical] + [str(project_file)]
         errors: list[str] = []
         for path in self._config.global_canonical:
-            if not path.exists():
+            content = self._read_text_if_exists(path)
+            if not content:
                 errors.append(f"missing truth canonical: {path}")
                 continue
-            content = path.read_text(encoding="utf-8")
             errors.extend(self._truth_basis_errors_for(path, content))
-        if project_file.exists():
-            project_content = project_file.read_text(encoding="utf-8")
+        project_content = self._read_text_if_exists(project_file)
+        if project_content:
             project_sections = self._truth_basis_sections_for(project_file, project_content)
             errors.extend(self._truth_basis_errors_for(project_file, project_content))
         else:
