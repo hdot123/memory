@@ -1,13 +1,17 @@
 #!/opt/homebrew/bin/python3
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    from ._file_utils import exclusive_lock
+except ImportError:
+    from _file_utils import exclusive_lock  # type: ignore[import-not-found]
 
 
 class HookStateError(RuntimeError):
@@ -24,11 +28,8 @@ def _exclusive_hook_state_lock(path: Path):
     lock_path = _hook_state_lock_path(path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
+        with exclusive_lock(handle):
             yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def runtime_state_dir(project_dir: Path) -> Path:

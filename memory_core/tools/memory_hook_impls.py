@@ -98,6 +98,26 @@ try:
 except ImportError:
     pass
 
+# Import domain exceptions (REF-001 §4.8)
+try:
+    from ._rule_errors import (
+        UnknownHostError,
+        UnknownRouteKindError,
+        UnsupportedScopeError,
+    )
+except ImportError:
+    from _rule_errors import (  # type: ignore
+        UnknownHostError,
+        UnknownRouteKindError,
+        UnsupportedScopeError,
+    )
+
+# Import now_iso utility (REF-001 §4.8)
+try:
+    from ._file_utils import now_iso
+except ImportError:
+    from _file_utils import now_iso  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # IF-1: HostDelegate Implementations
@@ -444,7 +464,7 @@ class PolicyRegistryImpl(PolicyRegistry):
             Dict containing policy pack with schema_version, policies, conflict_strategy
         """
         if self._allowed_scopes and scope not in self._allowed_scopes:
-            raise ValueError(f"unsupported scope: {scope}")
+            raise UnsupportedScopeError(f"unsupported scope: {scope}")
         result: dict[str, Any] = {
             "schema_version": self._schema_version,
             "scope": scope,
@@ -579,7 +599,7 @@ class RouteTargetPolicyImpl(RouteTargetPolicy):
         try:
             return self._routes[kind]
         except KeyError:
-            raise ValueError(f"unsupported route kind: {kind}")
+            raise UnknownRouteKindError(f"unsupported route kind: {kind}")
 
     def resolve_kb_file(self, domain: str, filename: str) -> Path | None:
         """Resolve a knowledge base file with layered fallback.
@@ -910,7 +930,7 @@ class ErrorSinkImpl(ErrorSink):
         now_iso_fn: Callable[[], str] | None = None,
     ):
         self._error_log = error_log
-        self._now_iso = now_iso_fn or (lambda: datetime.now().astimezone().isoformat(timespec="seconds"))
+        self._now_iso = now_iso_fn or now_iso
 
     @staticmethod
     def _readable_path(structured_log: Path) -> Path:
@@ -1069,14 +1089,14 @@ class DelegateRouter:
         if host == "factory":
             return self.factory_delegate.execute(event, raw_payload, payload)
         else:
-            raise ValueError(f"unknown host: {host}")
+            raise UnknownHostError(f"unknown host: {host}")
 
     def noop(self, host: str) -> subprocess.CompletedProcess[str]:
         """Execute noop response for the factory host."""
         if host == "factory":
             return self.factory_delegate.noop_response()
         else:
-            raise ValueError(f"unknown host: {host}")
+            raise UnknownHostError(f"unknown host: {host}")
 
 
 # ---------------------------------------------------------------------------

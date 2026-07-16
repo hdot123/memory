@@ -17,6 +17,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# Domain exceptions
+from memory_core.tools._rule_errors import UnknownRouteKindError
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -864,8 +867,8 @@ class TestResolveRouteTarget:
         assert isinstance(result, str)
 
     def test_resolve_route_target_invalid_kind(self, gw):
-        """resolve_route_target raises ValueError for invalid kind."""
-        with pytest.raises(ValueError, match="unsupported route kind"):
+        """resolve_route_target raises UnknownRouteKindError for invalid kind."""
+        with pytest.raises(UnknownRouteKindError, match="unsupported route kind"):
             gw.resolve_route_target("invalid_kind")
 
 

@@ -14,13 +14,18 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from memory_core.tools._guard_classify import _get_project_root_for_task, classify_tool_use  # noqa: F401
 from memory_core.tools._guard_patterns import FORBIDDEN_DIRS, FORBIDDEN_SUFFIXES  # noqa: F401
 from memory_core.tools.memory_hook_metrics import _resolve_metrics_path, append_metrics_record
+
+# Import now_iso utility (REF-001 §4.8)
+try:
+    from ._file_utils import now_iso
+except ImportError:
+    from _file_utils import now_iso  # type: ignore
 
 
 def _load_project_root() -> Path | None:
@@ -42,9 +47,7 @@ def _load_project_root() -> Path | None:
         return None
 
 
-def _now_iso() -> str:
-    """Return current time as ISO 8601 string."""
-    return datetime.now().astimezone().isoformat(timespec="seconds")
+_now_iso = now_iso
 
 
 def _write_metrics_jsonl(project_root: Path, record: dict[str, Any]) -> None:

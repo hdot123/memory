@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import hashlib
 import json
 import os
@@ -13,6 +12,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
+
+# Import file utilities (REF-001 §4.8)
+try:
+    from ._file_utils import exclusive_lock, now_iso
+except ImportError:
+    from _file_utils import exclusive_lock, now_iso  # type: ignore
 
 # Import shared rule helpers (consolidation REF-001 §4.3)
 try:
@@ -1506,7 +1511,7 @@ def _log_prompt_submit(project_root: Path, payload: dict[str, Any]) -> None:
         - **累计 prompt 数**: {count}
         ---
 
-    Uses ``fcntl.flock(LOCK_EX)`` for exclusive lock during append.
+    Uses ``exclusive_lock`` for exclusive lock during append.
     Protected by a 2-second SIGALRM timeout.
 
     Fallback: if payload lacks ``prompt``, reads ``transcript_path`` last
@@ -1528,7 +1533,7 @@ def _log_prompt_submit(project_root: Path, payload: dict[str, Any]) -> None:
         prompt = "(no prompt captured)"
 
     # ── Build heartbeat content ─────────────────────────────────────
-    now = datetime.now().astimezone()
+    now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
     session_prefix = session_id[:8]
@@ -1569,13 +1574,9 @@ def _log_prompt_submit(project_root: Path, payload: dict[str, Any]) -> None:
         signal.alarm(2)  # 2-second timeout
 
         with log_file.open("a", encoding="utf-8") as fh:
-            fd = fh.fileno()
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            try:
+            with exclusive_lock(fh):
                 fh.write(heartbeat)
                 fh.flush()
-            finally:
-                fcntl.flock(fd, fcntl.LOCK_UN)
     except HookTimeoutError:
         _logger.warning("_log_prompt_submit: write timed out for session %s", session_prefix)
     finally:
@@ -1802,13 +1803,10 @@ def _maybe_sync_telemetry(artifact_root: Path) -> None:
                                 remaining_lines.append(line)
 
                     with metrics_file.open("w", encoding="utf-8") as f:
-                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                        try:
+                        with exclusive_lock(f):
                             f.writelines(remaining_lines)
                             f.flush()
                             os.fsync(f.fileno())
-                        finally:
-                            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
                     offset_file.write_text("0", encoding="utf-8")
                 except OSError as exc:
@@ -1848,7 +1846,7 @@ def _write_sync_status(artifact_root: Path, success: bool, pending_count: int) -
         pending_count: Number of records waiting to be synced
     """
     status_file = artifact_root / ".sync_status.json"
-    now_iso = datetime.now().astimezone().isoformat(timespec="seconds")
+    now_iso_val = now_iso()
 
     # Read existing status
     status: dict[str, Any] = {}
@@ -1859,10 +1857,10 @@ def _write_sync_status(artifact_root: Path, success: bool, pending_count: int) -
             status = {}
 
     if success:
-        status["last_success_ts"] = now_iso
+        status["last_success_ts"] = now_iso_val
         status["failure_count"] = 0
     else:
-        status["last_failure_ts"] = now_iso
+        status["last_failure_ts"] = now_iso_val
         status["failure_count"] = int(status.get("failure_count", 0)) + 1
 
     status["pending_count"] = pending_count
@@ -2077,7 +2075,7 @@ def _gateway_excepthook(exc_type, exc_value, exc_tb):
             "error_type": exc_type.__name__,
             "error_message": str(exc_value)[:500],
             "hook_version": "memory-hook-gateway-v1",
-            "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "timestamp": now_iso(),
             "duration_ms": duration_ms,
             "status": "error",
         }
