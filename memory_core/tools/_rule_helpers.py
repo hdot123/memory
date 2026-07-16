@@ -12,7 +12,9 @@ Part of REF-001 strangler fig scaffold phase.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 
 def _path_is_under(path: Path, root: Path) -> bool:
@@ -22,6 +24,41 @@ def _path_is_under(path: Path, root: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _get_write_targets_dict(workspace_root: Path) -> dict[str, Any]:
+    """
+    Build the standard write targets dictionary.
+
+    This is the single source of truth for the write-targets mapping used by:
+    - memory_hook_impls.py (PathUtils.write_targets)
+    - memory_hook_gateway.py (write_targets function)
+
+    Args:
+        workspace_root: The workspace root path
+
+    Returns:
+        Dictionary mapping target names to their paths
+    """
+    today_log = workspace_root / "memory" / "log" / f"{datetime.now().date().isoformat()}.md"
+    return {
+        "fact": str(today_log),
+        "global_canonical": str(workspace_root / "memory" / "kb" / "global"),
+        "project_canonical": str(workspace_root / "memory" / "kb" / "projects"),
+        "decision": str(workspace_root / "memory" / "kb" / "decisions"),
+        "lesson": str(workspace_root / "memory" / "kb" / "lessons"),
+        "docs": str(workspace_root / "memory" / "docs"),
+        "action": str(workspace_root / "memory" / "inbox.md"),
+        "project_runtime": str(workspace_root / "projects"),
+        "artifacts": str(workspace_root / "memory" / "artifacts"),
+        "system_error": str(workspace_root / "memory" / "system" / "errors.log"),
+        "invalid_memory": str(workspace_root / "memory" / "archive" / "invalid"),
+        "kb_policy": {
+            "mode": "read-first-CRUD",
+            "overwrite_allowed": False,
+            "conflict_strategy": "preserve-and-escalate",
+        },
+    }
 
 
 def _path_is_under_lexical(path: Path, root: Path) -> bool:

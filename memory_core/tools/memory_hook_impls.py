@@ -20,6 +20,32 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+# Import shared rule helpers (consolidation REF-001 §4.3)
+try:
+    from ._rule_helpers import (
+        _existing_paths,
+        _get_write_targets_dict,
+        _json_object_keys,
+        _json_string_values,
+        _markdown_code_tokens,
+        _path_is_under,
+        _path_is_under_lexical,
+        _section_body,
+        _section_bullets,
+    )
+except ImportError:
+    from _rule_helpers import (  # type: ignore
+        _existing_paths,
+        _get_write_targets_dict,
+        _json_object_keys,
+        _json_string_values,
+        _markdown_code_tokens,
+        _path_is_under,
+        _path_is_under_lexical,
+        _section_body,
+        _section_bullets,
+    )
+
 try:
     from .memory_hook_interfaces import (
         ArtifactSink,
@@ -712,37 +738,16 @@ class GatewayBusinessPolicyImpl(GatewayBusinessPolicy):
             return path
         return (self._config.repo_root / path).resolve()
 
-    @staticmethod
-    def _path_is_under(path: Path, root: Path) -> bool:
-        try:
-            path.resolve().relative_to(root.resolve())
-            return True
-        except ValueError:
-            return False
-
-    @staticmethod
-    def _path_is_under_lexical(path: Path, root: Path) -> bool:
-        """Check lexical containment without following symlinks."""
-        try:
-            path.expanduser().absolute().relative_to(root.expanduser().absolute())
-            return True
-        except ValueError:
-            return False
-
     def _read_text_if_exists(self, path: Path) -> str:
         return self._config.read_text_if_exists_fn(path)
 
-    @staticmethod
-    def _existing_paths(paths: list[Path]) -> list[str]:
-        return [str(path) for path in paths if path.exists()]
-
     def determine_project_scope(self, cwd: Path) -> str:
         cfg = self._config
-        if not self._path_is_under_lexical(cwd, cfg.repo_root):
+        if not _path_is_under_lexical(cwd, cfg.repo_root):
             return cfg.default_project_scope
         for scope, roots in cfg.scope_match_hints.items():
             for root in roots:
-                if self._path_is_under_lexical(cwd, root):
+                if _path_is_under_lexical(cwd, root):
                     return scope
         return cfg.default_project_scope
 
@@ -807,15 +812,15 @@ class GatewayBusinessPolicyImpl(GatewayBusinessPolicy):
 
     def decision_refs_for_scope(self, project_scope: str) -> list[str]:
         refs = self._config.default_decision_refs + self._config.project_decision_refs.get(project_scope, [])
-        return self._existing_paths(refs)
+        return _existing_paths(refs)
 
     def lesson_refs_for_scope(self, project_scope: str) -> list[str]:
         refs = self._config.default_lesson_refs + self._config.project_lesson_refs.get(project_scope, [])
-        return self._existing_paths(refs)
+        return _existing_paths(refs)
 
     def docs_refs_for_scope(self, project_scope: str) -> list[str]:
         refs = self._config.project_doc_refs.get(project_scope, [])
-        return self._existing_paths(refs)
+        return _existing_paths(refs)
 
     def truth_basis_for_scope(self, project_scope: str) -> TruthBasis:
         """Delegate to TruthBasisResolver from business_policy_checks."""
@@ -1114,21 +1119,4 @@ class PathUtilsImpl(PathUtils):
         Mirrors the gateway's write_targets fallback dict, which is also
         identical to WriteTargetPolicyImpl's internal targets structure.
         """
-        return {
-            "fact": str(self._workspace_root / "memory" / "log" / f"{datetime.now().date().isoformat()}.md"),
-            "global_canonical": str(self._workspace_root / "memory" / "kb" / "global"),
-            "project_canonical": str(self._workspace_root / "memory" / "kb" / "projects"),
-            "decision": str(self._workspace_root / "memory" / "kb" / "decisions"),
-            "lesson": str(self._workspace_root / "memory" / "kb" / "lessons"),
-            "docs": str(self._workspace_root / "memory" / "docs"),
-            "action": str(self._workspace_root / "memory" / "inbox.md"),
-            "project_runtime": str(self._workspace_root / "projects"),
-            "artifacts": str(self._workspace_root / "memory" / "artifacts"),
-            "system_error": str(self._workspace_root / "memory" / "system" / "errors.log"),
-            "invalid_memory": str(self._workspace_root / "memory" / "archive" / "invalid"),
-            "kb_policy": {
-                "mode": "read-first-CRUD",
-                "overwrite_allowed": False,
-                "conflict_strategy": "preserve-and-escalate",
-            },
-        }
+        return _get_write_targets_dict(self._workspace_root)

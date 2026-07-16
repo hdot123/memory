@@ -14,6 +14,32 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+# Import shared rule helpers (consolidation REF-001 §4.3)
+try:
+    from ._rule_helpers import (
+        _existing_paths,
+        _get_write_targets_dict,
+        _json_object_keys,
+        _json_string_values,
+        _markdown_code_tokens,
+        _path_is_under,
+        _path_is_under_lexical,
+        _section_body,
+        _section_bullets,
+    )
+except ImportError:
+    from _rule_helpers import (  # type: ignore
+        _existing_paths,
+        _get_write_targets_dict,
+        _json_object_keys,
+        _json_string_values,
+        _markdown_code_tokens,
+        _path_is_under,
+        _path_is_under_lexical,
+        _section_body,
+        _section_bullets,
+    )
+
 SCRIPT_PATH = Path(__file__).resolve()
 try:
     # Consolidated: import from denylist instead of denied_project_roots
@@ -638,66 +664,12 @@ def _extract_excerpt(path: Path, max_lines: int = 12) -> list[str]:
     return lines
 
 
-def _section_bullets(text: str, heading: str) -> list[str]:
-    lines = text.splitlines()
-    bullets: list[str] = []
-    in_section = False
-    for line in lines:
-        stripped = line.strip()
-        if stripped == heading or stripped.endswith(heading.replace("## ", "").replace("### ", "")):
-            in_section = True
-            continue
-        if in_section and stripped.startswith("#"):
-            break
-        if in_section and line.strip().startswith("- "):
-            bullets.append(line.strip()[2:].strip().strip("`"))
-    return bullets
-
-
-def _section_body(text: str, heading: str) -> str:
-    lines = text.splitlines()
-    start_idx: int | None = None
-    for idx, line in enumerate(lines):
-        if line.strip() == heading:
-            start_idx = idx + 1
-            break
-    if start_idx is None:
-        return ""
-    body: list[str] = []
-    for line in lines[start_idx:]:
-        if line.strip().startswith("## "):
-            break
-        body.append(line)
-    return "\n".join(body)
-
-
-def _markdown_code_tokens(text: str) -> set[str]:
-    return {match.group(1) for match in re.finditer(r"`([^`]+)`", text)}
-
-
-def _json_string_values(text: str, key: str) -> set[str]:
-    pattern = rf'"{re.escape(key)}"\s*:\s*"([^"]+)"'
-    return {match.group(1) for match in re.finditer(pattern, text)}
-
-
-def _json_object_keys(text: str) -> set[str]:
-    return {match.group(1) for match in re.finditer(r'"([^"]+)"\s*:', text)}
-
-
 def governance_frozen_tuple_blocker_errors() -> list[str]:
     return _get_gateway_business_policy().governance_frozen_tuple_blocker_errors()
 
 
 def event_contract_blocker_errors() -> list[str]:
     return _get_gateway_business_policy().event_contract_blocker_errors()
-
-
-def _path_is_under(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-        return True
-    except ValueError:
-        return False
 
 
 def _classify_truth_ref(path: Path) -> str:
@@ -798,10 +770,6 @@ def _truth_basis_errors_for(path: Path) -> list[str]:
     if evidence_paths and not any(_lower_evidence_ref(evidence_path) for evidence_path in evidence_paths):
         errors.append(f"evidence refs do not include lower-layer support: {path}")
     return errors
-
-
-def _existing_paths(paths: list[Path]) -> list[str]:
-    return [str(path) for path in paths if path.exists()]
 
 
 def _normalize_repo_scope_entry(value: str | Path) -> str | None:
@@ -935,25 +903,7 @@ def write_targets() -> dict[str, Any]:
     try:
         return _write_targets_via_policy()
     except Exception:
-        today_log = WORKSPACE_ROOT / "memory" / "log" / f"{datetime.now().date().isoformat()}.md"
-        return _apply_hook_runtime_write_targets({
-            "fact": str(today_log),
-            "global_canonical": str(WORKSPACE_ROOT / "memory" / "kb" / "global"),
-            "project_canonical": str(WORKSPACE_ROOT / "memory" / "kb" / "projects"),
-            "decision": str(WORKSPACE_ROOT / "memory" / "kb" / "decisions"),
-            "lesson": str(WORKSPACE_ROOT / "memory" / "kb" / "lessons"),
-            "docs": str(WORKSPACE_ROOT / "memory" / "docs"),
-            "action": str(WORKSPACE_ROOT / "memory" / "inbox.md"),
-            "project_runtime": str(WORKSPACE_ROOT / "projects"),
-            "artifacts": str(WORKSPACE_ROOT / "memory" / "artifacts"),
-            "system_error": str(ERROR_LOG),
-            "invalid_memory": str(_configured_invalid_memory_root(WORKSPACE_ROOT)),
-            "kb_policy": {
-                "mode": "read-first-CRUD",
-                "overwrite_allowed": False,
-                "conflict_strategy": "preserve-and-escalate",
-            },
-        })
+        return _apply_hook_runtime_write_targets(_get_write_targets_dict(WORKSPACE_ROOT))
 
 
 def resolve_route_target(kind: str) -> str:
