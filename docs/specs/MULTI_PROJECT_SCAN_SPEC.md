@@ -41,19 +41,19 @@ registry 是 TOML 格式的索引文件，位于 memory 仓库中：
 
 [[project]]
 name = "workbot"
-local_path = "/Users/busiji/tool/workbot"
+local_path = "/Users/<user>/tool/workbot"
 repo = "https://github.com/hdot123/workbot"
 memory_lock = { memory_version = "0.1.0", schema_version = "wb-hook-v2", adapter_version = "builtin" }
 
 [[project]]
 name = "axonhub"
-local_path = "/Users/busiji/tool/axonhub"
+local_path = "/Users/<user>/tool/axonhub"
 repo = "https://github.com/hdot123/axonhub"
 memory_lock = { memory_version = "0.1.0", schema_version = "context-package-v1", adapter_version = "builtin" }
 
 [[project]]
 name = "codex"
-local_path = "/Users/busiji/.codex"
+local_path = "/Users/<user>/.codex"
 repo = "https://github.com/openai/codex"
 memory_lock = { memory_version = "0.2.0", schema_version = "context-package-v1", adapter_version = "custom-adapter-v1" }
 ```
@@ -133,7 +133,7 @@ registry 只包含：
   "projects": [
     {
       "name": "workbot",
-      "local_path": "/Users/busiji/tool/workbot",
+      "local_path": "/Users/<user>/tool/workbot",
       "repo": "https://github.com/hdot123/workbot",
       "current": {
         "memory_version": "0.1.0",
@@ -153,7 +153,7 @@ registry 只包含：
     },
     {
       "name": "axonhub",
-      "local_path": "/Users/busiji/tool/axonhub",
+      "local_path": "/Users/<user>/tool/axonhub",
       "repo": "https://github.com/hdot123/axonhub",
       "current": {
         "memory_version": "0.1.0",
@@ -173,7 +173,7 @@ registry 只包含：
     },
     {
       "name": "codex",
-      "local_path": "/Users/busiji/.codex",
+      "local_path": "/Users/<user>/.codex",
       "repo": "https://github.com/openai/codex",
       "current": {
         "memory_version": "0.2.0",
