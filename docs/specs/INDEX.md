@@ -18,9 +18,8 @@ This index is the public entry point for memory-core documentation. Normal users
 
 These documents describe migration formats and historical migration processes. Some are archived references and may mention legacy paths or workflows that are not current implementation guidance.
 
-- [Migration format specification](MIGRATION_FORMAT_SPEC.md)
-- [Migration rules](MIGRATION_RULES.md)
-- [Migration checklist](MIGRATION_CHECKLIST.md)
+- [Migration format specification](../../memory/docs/archive/MIGRATION_FORMAT_SPEC.md) — archived migration format specification (instance-specific, not tracked)
+- Migration rules and checklist are also in `memory/docs/archive/` (instance-specific, not tracked)
 
 ## Architecture / design docs
 
@@ -40,10 +39,7 @@ Detailed architecture documents live under [`docs/architecture/`](../architectur
 
 ## Plans & milestones
 
-- [PLAN-STATUS](PLAN-STATUS.md) — active plan status mirror (synced from ShowDoc).
-- [PLAN-0003: 9/9 Hook coverage](PLAN-0003-9-9-HOOK-COVERAGE.md) — Factory hook 100% integration plan.
-- [Ownership execution plan](EXECUTION_PLAN_OWNERSHIP_PROTECTION.md) — M1-M6 milestone execution steps.
-- [Ownership upgrade plan](UPGRADE_PLAN_OWNERSHIP_PROTECTION.md) — v3 merged upgrade plan (design reference).
+Plans and milestones documents are instance-specific and live in `memory/docs/plans/` (not tracked).
 
 ## Specifications (extended)
 
@@ -51,7 +47,7 @@ Detailed architecture documents live under [`docs/architecture/`](../architectur
 
 ## Engineering notes
 
-- [Prompt truncation solutions](prompt-truncation-engineering-solutions.md) — systematic solutions for Task prompt truncation.
+Engineering notes are instance-specific and live in `memory/docs/notes/` (not tracked).
 
 ## Bug reports
 
