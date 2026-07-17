@@ -29,9 +29,9 @@ def _parse_value(raw: str | None) -> bool | None:
         True for truthy values (1/true/yes/on, case-insensitive)
         False for falsy values (0/false/no/off, case-insensitive)
         None if raw is None or empty
-        None for unknown values (logged at debug level)
+        False for unknown values (logged at debug level)
     """
-    if raw is None or raw == "":
+    if raw is None or raw.strip() == "":
         return None
 
     normalized = raw.strip().lower()
@@ -87,6 +87,8 @@ class FeatureFlagRegistry:
             raise ValueError(
                 f"Invalid flag name {name!r}: must match {_FLAG_NAME_RE.pattern}"
             )
+        if upper in self._flags:
+            logger.debug("feature_flags: overriding existing flag %s", upper)
         flag = FeatureFlag(name=upper, default=default, description=description)
         self._flags[upper] = flag
         return flag
@@ -135,6 +137,11 @@ def register_flag(
 def list_flags() -> list[FeatureFlag]:
     """List all registered feature flags, sorted by name."""
     return _global_registry.list_flags()
+
+
+def reset_flags() -> None:
+    """Reset the global feature flag registry (for testing)."""
+    _global_registry.clear()
 
 
 def is_enabled(name: str, default: bool | None = None) -> bool:

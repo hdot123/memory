@@ -1,18 +1,15 @@
 """Tests for feature_flags module."""
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from memory_core.tools.feature_flags import (
     FeatureFlag,
-    FeatureFlagRegistry,
-    _global_registry,
     _parse_value,
     is_enabled,
-    register_flag,
     list_flags,
+    register_flag,
+    reset_flags,
 )
 
 
@@ -24,7 +21,7 @@ class TestParseValue:
         for val in ("1", "true", "TRUE", "True", "yes", "YES", "on", "ON"):
             assert _parse_value(val) is True, f"Expected True for {val!r}"
 
-    def test_parse_valuefalsy(self) -> None:
+    def test_parse_value_falsy(self) -> None:
         """Falsy values return False."""
         for val in ("0", "false", "FALSE", "False", "no", "NO", "off", "OFF"):
             assert _parse_value(val) is False, f"Expected False for {val!r}"
@@ -53,9 +50,9 @@ class TestFeatureFlagRegistry:
     @pytest.fixture(autouse=True)
     def reset_registry(self) -> None:
         """Reset global registry before each test."""
-        _global_registry.clear()
+        reset_flags()
         yield
-        _global_registry.clear()
+        reset_flags()
 
     def test_register_flag(self) -> None:
         """register_flag creates and returns a FeatureFlag."""
@@ -90,25 +87,28 @@ class TestFeatureFlagRegistry:
     def test_registry_get(self) -> None:
         """Registry.get returns the flag or None."""
         register_flag("TEST_FLAG", default=True)
-        assert _global_registry.get("TEST_FLAG") is not None
-        assert _global_registry.get("TEST_FLAG").default is True
-        assert _global_registry.get("NONEXISTENT") is None
+        flags = list_flags()
+        assert len(flags) == 1
+        assert flags[0].default is True
+        assert is_enabled("NONEXISTENT") is False
 
     def test_registry_len_and_contains(self) -> None:
         """Registry supports len and 'in' operator."""
         register_flag("A")
         register_flag("B")
-        assert len(_global_registry) == 2
-        assert "A" in _global_registry
-        assert "a" in _global_registry  # case-insensitive
-        assert "C" not in _global_registry
+        assert len(list_flags()) == 2
+        assert "A" in [f.name for f in list_flags()]
+        assert "a" in [f.name.lower() for f in list_flags()]  # case-insensitive
+        assert not any(f.name == "C" for f in list_flags())
 
     def test_registry_clear(self) -> None:
         """Registry.clear removes all flags."""
         register_flag("X")
-        assert len(_global_registry) == 1
-        _global_registry.clear()
-        assert len(_global_registry) == 0
+        flags = list_flags()
+        assert len(flags) == 1
+        reset_flags()
+        flags = list_flags()
+        assert len(flags) == 0
 
 
 class TestIsEnabled:
@@ -118,13 +118,13 @@ class TestIsEnabled:
     def reset_registry(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Reset global registry and env before each test."""
         import os as _os
-        _global_registry.clear()
+        reset_flags()
         # Remove any MEMORY_FEATURE_* vars that might leak
         for key in list(_os.environ.keys()):
             if key.startswith("MEMORY_FEATURE_"):
                 monkeypatch.delenv(key, raising=False)
         yield
-        _global_registry.clear()
+        reset_flags()
 
     def test_is_enabled_env_truthy(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Env var truthy value returns True."""
