@@ -51,6 +51,7 @@ hook event (PreToolUse / SessionEnd / gateway)
 **Key design principles:**
 - **Hook hot path**: Only local JSONL writes (microseconds), no PostHog SDK imports, zero network blocking
 - **Batch sync on session-start**: Hourly rate limit, 2s connectivity probe, incremental via offset sidecar
+- **Timeout safeguards**: All network calls in hook paths use strict timeouts (HTTP 3s, git subprocess 5s) to prevent hook budget exhaustion under network or system pressure
 - **Fail-safe**: All telemetry wrapped in try/except; analytics failures never affect hook behavior
 - **Data sanitization**: Full file paths replaced with basenames before sending to PostHog
 - **PostHog**: Public API key built-in from data file (default_posthog_key.txt); set POSTHOG_API_KEY='' to disable
