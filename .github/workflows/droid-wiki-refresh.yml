@@ -2,9 +2,9 @@ name: Droid AutoWiki Refresh
 
 # Auto-regenerate the Factory App Wiki on every push to the default branch.
 # Wiki content is stored ONLY in the Factory App (private to the org).
-# GitHub Wiki tab is intentionally never initialized, so /wiki skips the
-# github-wiki sync step gracefully (see /cli/features/wiki/generate.md).
-# The FACTORY_API_KEY secret is already configured for droid-review.yml / droid.yml.
+# Defense-in-depth: repo-level has_wiki=false (set via gh api) ensures the
+# {repo}.wiki.git endpoint 404s, so even if /wiki's github-sync logic changes
+# it cannot push content to a world-readable GitHub Wiki tab on this public repo.
 on:
   push:
     branches: [main]
@@ -19,6 +19,10 @@ jobs:
         run: curl -fsSL https://app.factory.ai/cli | sh
 
       - name: Generate Wiki
-        run: droid exec --auto high "/wiki"
+        # grok-4.5 is a Factory built-in model available to the org's plan
+        # (proven by droid.yml). Default claude-opus-4-8 is not in-plan and
+        # fails in ~2s. BYOK models (glm-5.2/qwen3.7-plus/kimi-k2.5) need
+        # local settings.json which CI runners don't have.
+        run: droid exec --auto high --model grok-4.5 "/wiki"
         env:
           FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
