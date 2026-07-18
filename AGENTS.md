@@ -40,11 +40,14 @@ memory-core 是只读协议仓库，提供 .memory/ 协议、模板、Schema、C
 
 **任何涉及知识库的读取或写入操作前，必须先读取 `~/.factory/AGENTS.md` 确认术语到路径的映射。不可凭记忆或上下文推断路径。**
 
+**新增任何 CI / 配置文件（workflow、pre-commit hook、lint 规则等）前，必须先 grep 现有同类文件的处理方式。不可直接抄官方模板 —— 模板不知道本仓库已有的 BYOK 模型路由、secret 命名、认证模式。**
+
 | 操作场景 | 前置要求 |
 |----------|---------|
 | 写入 `memory/kb/`、`docs/`、`~/.memory/global-kb/` | 先查路由表确认目标层和正确路径 |
 | 读取项目知识库 | 先确认 Layer 3 → Layer 2 fallback 顺序 |
 | 用户说"记下来"/"写文档"/"记录决策" | 先读项目 AGENTS.md 确认分类规则，再执行写入 |
+| 新增 `.github/workflows/*.yml` 等配置文件 | 先读 `.github/workflows/` 同类文件, 对齐模型/secret/认证模式 |
 
 ## 文档分类规则
 
@@ -104,6 +107,19 @@ memory-core 是只读协议仓库，提供 .memory/ 协议、模板、Schema、C
 **创建 PR 后必须调用 `scripts/write-pending-ci.sh <PR_NUMBER>`，确保 CI 完成后 webhook 能路由回当前 session。**
 
 流程：创建 PR → 执行 `scripts/write-pending-ci.sh <PR_NUMBER>` → CI 完成后 n8n webhook 触发 trigger-ci-droid.sh → 读取 pending-ci.json → 注入当前 session。
+
+## 约定：Wiki 不走 CI
+
+**AutoWiki 生成 (`droid exec "/wiki"`) 只在本地手动运行，不配置 CI workflow 自动触发。**
+
+理由（实测得出，非推断）：
+- qwen3.7-plus BYOK 通过 Kong proxy 跑 `/wiki` 长 session 卡住 25+ 分钟（droid-review 的单次 PR diff 场景正常，但 wiki 多轮工具调用 + 长上下文不适用）
+- Factory 内置模型 (grok-4.5 等) 虽可用但消耗标准积分，非期望路径
+- 本仓库只读约束下，wiki 内容只需在**本地 `droid-wiki/`** + **Factory App** 两个地方有，不需要 CI 自动刷新
+
+正确做法：需要更新 wiki 时，本地执行 `droid exec --auto high "/wiki"`。**禁止再次安装 `.github/workflows/droid-wiki-refresh.yml` 或等效 CI 自动化**，除非用户明确要求且已验证模型可用。
+
+GitHub 这边：repo-level `has_wiki=false`（gh api 设置），`.wiki.git` endpoint 直接 404，wiki 内容永不进公开 GitHub Wiki tab。
 
 ## Linear Gateway
 
