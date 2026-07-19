@@ -55,9 +55,6 @@ LEGACY_FORBIDDEN_OVERWRITE_PATTERNS = [
     "CLAUDE.md",
 ]
 
-# Forbidden files/patterns that must never be overwritten
-# Now dynamically populated via classify_owned_path()
-FORBIDDEN_OVERWRITE_PATTERNS = []  # type: list[str]
 
 # Allowed low-risk auto actions
 ALLOWED_AUTO_ACTIONS = {
@@ -189,12 +186,6 @@ def _is_forbidden_path(path: str, target: Path | None = None) -> bool:
     if "project-map" in path_lower:
         return True
     return False
-
-
-def _matches_pattern(path: str, pattern: str) -> bool:
-    """Simple pattern matching for forbidden paths."""
-    import fnmatch
-    return fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path.lower(), pattern.lower())
 
 
 # Import now_iso utility (REF-001 §4.8)
