@@ -46,16 +46,6 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-# Step 2.9: FORBIDDEN_OVERWRITE_PATTERNS replaced with classify_owned_path()
-# Legacy patterns kept for reference during transition
-LEGACY_FORBIDDEN_OVERWRITE_PATTERNS = [
-    "AGENTS.md",
-    "INDEX.md",
-    "project-map/**",
-    "CLAUDE.md",
-]
-
-
 # Allowed low-risk auto actions
 ALLOWED_AUTO_ACTIONS = {
     "move_root_pollution",
