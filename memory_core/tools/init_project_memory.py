@@ -1728,7 +1728,7 @@ def _validate_init_args(
     project_name: str,
 ) -> tuple[bool, str]:
     """Validate initialization arguments and check denylist/no-clobber.
-    
+
     Returns:
         Tuple of (is_valid, error_message). If is_valid is False, error_message explains why.
     """
@@ -1850,7 +1850,7 @@ def _should_skip_file(
     is_business_file: bool = False,
 ) -> tuple[bool, str]:
     """Determine if file should be skipped based on mode.
-    
+
     Returns (should_skip, reason)
     """
     if not file_path.exists():
@@ -1899,14 +1899,14 @@ def _write_template_file(
     decorate_fn: Any = None,
 ) -> tuple[bool, bool]:
     """Write a single template file with mode-aware handling.
-    
+
     Returns (was_overwritten, was_skipped)
     """
     was_overwritten = False
     was_skipped = False
 
     file_exists_before = file_path.exists()
-    
+
     should_skip, reason = _should_skip_file(
         file_path, mode, force, ownership, authorized_maintenance, target, result, is_business_file
     )
@@ -1919,13 +1919,13 @@ def _write_template_file(
         content, warnings = template_fn(project_name)
         if decorate_fn:
             content = decorate_fn(fname, content)
-        
+
         if file_exists_before:
             result["created"].append(f"file:{fname} (overwritten)")
             was_overwritten = True
         else:
             result["created"].append(f"file:{fname}")
-        
+
         file_path.write_text(content, encoding="utf-8")
         result["warnings"].extend(warnings)
     except Exception as exc:
@@ -1968,7 +1968,7 @@ def _render_standard_templates(
     result: dict[str, Any],
 ) -> tuple[bool, bool]:
     """Render KB_TEMPLATES and FILE_TEMPLATES.
-    
+
     Returns (any_overwritten, any_skipped)
     """
     any_overwritten = False
@@ -2003,7 +2003,7 @@ def _render_evidence_ref_files(
     result: dict[str, Any],
 ) -> tuple[bool, bool]:
     """Render evidence reference files (tests/.memory-anchor.md, tools/health-check.sh).
-    
+
     Returns (any_overwritten, any_skipped)
     """
     any_overwritten = False
@@ -2070,7 +2070,7 @@ def _render_special_files(
     result: dict[str, Any],
 ) -> tuple[bool, bool]:
     """Render special files (adapter.toml, inbox.md, anchor, health-check, scope.md).
-    
+
     Returns (any_overwritten, any_skipped)
     """
     any_overwritten = False
@@ -2121,7 +2121,7 @@ def _render_per_scope_files(
     result: dict[str, Any],
 ) -> tuple[bool, bool]:
     """Render per-scope control loop files (CANONICAL.md, STATE.md, PLAN.md, TASKS.md, NOW.md).
-    
+
     Returns (any_overwritten, any_skipped)
     """
     any_overwritten = False
@@ -2168,7 +2168,7 @@ def _render_all_templates(
     result: dict[str, Any],
 ) -> tuple[bool, bool]:
     """Render all template files with mode-aware handling.
-    
+
     Returns (any_overwritten, any_skipped)
     """
     ownership = load_memory_ownership(target)
