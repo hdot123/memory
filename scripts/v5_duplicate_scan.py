@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import ast
 import sys
-import tokenize
-import io
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import NamedTuple
@@ -142,7 +140,7 @@ def main() -> int:
     print("=" * 72)
     print(f"Threshold: {SIMILARITY_THRESHOLD}")
     print(f"Min-size filter: ≥{MIN_BODY_LINES} lines OR ≥{MIN_AST_TOKENS} tokens")
-    print(f"Scope: memory_core/ + scripts/")
+    print("Scope: memory_core/ + scripts/")
     print()
 
     duplicates = scan()
