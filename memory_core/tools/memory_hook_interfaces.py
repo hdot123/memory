@@ -13,7 +13,7 @@ from __future__ import annotations
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Protocol, TypedDict
+from typing import Any, TypedDict
 
 # ---------------------------------------------------------------------------
 # TypedDict for dict key contracts
