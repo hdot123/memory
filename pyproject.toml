@@ -216,5 +216,6 @@ DEP003 = ["yaml"]
 [tool.vulture]
 exclude = ["memory_core/tools/_validation_constants.py"]
 min_confidence = 60
+paths = ["memory_core", "scripts", "vulture_whitelist.py"]
 
 
