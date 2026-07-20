@@ -213,4 +213,8 @@ DEP002 = [
 ]
 DEP003 = ["yaml"]
 
+[tool.vulture]
+exclude = ["memory_core/tools/_validation_constants.py"]
+min_confidence = 60
+
 

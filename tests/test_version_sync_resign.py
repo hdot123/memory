@@ -11,6 +11,38 @@ from pathlib import Path
 from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
+# Edge case tests (M3): regex no-match + file not found
+# ---------------------------------------------------------------------------
+
+class TestVersionSyncEdgeCases:
+    """M3: version_sync.py 边缘测试 - regex 无匹配 + 文件不存在"""
+
+    def test_read_version_regex_no_match(self, tmp_path: Path) -> None:
+        """文件存在但无 memory_version 字段时返回 None（regex 无匹配）"""
+        sys_dir = tmp_path / "memory" / "system"
+        sys_dir.mkdir(parents=True)
+        ownership = sys_dir / "ownership.toml"
+        # 写入不含 memory_version 的内容
+        ownership.write_text(
+            '[project]\nname = "test"\n',
+            encoding="utf-8",
+        )
+
+        from memory_core.tools.version_sync import read_ownership_memory_version
+
+        result = read_ownership_memory_version(ownership)
+        assert result is None, "Expected None when memory_version field is missing"
+
+    def test_read_version_file_not_found(self, tmp_path: Path) -> None:
+        """文件不存在时返回 None"""
+        nonexistent = tmp_path / "memory" / "system" / "ownership.toml"
+
+        from memory_core.tools.version_sync import read_ownership_memory_version
+
+        result = read_ownership_memory_version(nonexistent)
+        assert result is None, "Expected None when file does not exist"
+
+# ---------------------------------------------------------------------------
 # Helper: create a minimal project layout
 # ---------------------------------------------------------------------------
 

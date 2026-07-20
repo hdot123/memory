@@ -262,3 +262,30 @@ class TestPromoteInteractiveMode:
         assert result.returncode == 0
         # Output mentions the pending file
         assert sample_pending_file.name in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Edge case test (M3): _update_index domain_marker not found branch
+# ---------------------------------------------------------------------------
+
+class TestPromoteUpdateIndexNoMarker:
+    """M3: promote_global_kb.py 边缘测试 - _update_index domain_marker 未找到分支"""
+
+    def test_update_index_no_domain_marker(self, global_kb, sample_pending_file):
+        """_update_index 当 INDEX.md 中无目标 domain_marker 时不写入内容"""
+        from memory_core.tools.promote_global_kb import _update_index
+
+        # 创建 INDEX.md 但不包含 operations 的 domain_marker
+        index_path = global_kb / "INDEX.md"
+        original_content = "# Global KB\n\nSome content without markers.\n"
+        index_path.write_text(original_content, encoding="utf-8")
+
+        # 调用 _update_index，传入不存在的 domain
+        _update_index(global_kb, "operations", "test-file.md")
+
+        # INDEX.md 内容应该保持不变（未被写入）
+        result_content = index_path.read_text(encoding="utf-8")
+        assert result_content == original_content, (
+            "_update_index should not modify INDEX.md when domain_marker is absent"
+        )
+        assert "test-file.md" not in result_content
