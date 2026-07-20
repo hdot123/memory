@@ -11,12 +11,8 @@ These tests establish behavior baseline BEFORE refactoring.
 """
 from __future__ import annotations
 
-import json
-from collections import Counter, deque
+from collections import Counter
 from datetime import datetime
-from pathlib import Path
-
-import pytest
 
 
 class TestParseJsonlTimestamp:

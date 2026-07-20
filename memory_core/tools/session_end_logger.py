@@ -91,10 +91,10 @@ def _read_settings(settings_path: Path) -> dict[str, Any]:
 
 def _parse_jsonl_timestamp(ts: str | None) -> datetime | None:
     """Parse ISO 8601 timestamp with Z suffix handling.
-    
+
     Args:
         ts: Timestamp string (ISO 8601 format, may end with Z)
-    
+
     Returns:
         Parsed datetime or None if invalid/empty
     """
@@ -108,18 +108,18 @@ def _parse_jsonl_timestamp(ts: str | None) -> datetime | None:
 
 def _extract_first_user_preview(msg: dict[str, Any] | None) -> str:
     """Extract text preview from first user message (max 200 chars).
-    
+
     Strips system-reminder tags and truncates with '...' if needed.
-    
+
     Args:
         msg: User message dict with 'content' field
-    
+
     Returns:
         Text preview string (empty if no valid content)
     """
     if not msg or not isinstance(msg.get("content"), list):
         return ""
-    
+
     for block in msg["content"]:
         if isinstance(block, dict) and block.get("type") == "text":
             text = block.get("text", "")
@@ -135,16 +135,16 @@ def _extract_first_user_preview(msg: dict[str, Any] | None) -> str:
 
 def _extract_assistant_summary_preview(msg: dict[str, Any] | None) -> str:
     """Extract text preview from last assistant message (max 300 chars).
-    
+
     Args:
         msg: Assistant message dict with 'content' field
-    
+
     Returns:
         Text preview string (empty if no valid content)
     """
     if not msg or not isinstance(msg.get("content"), list):
         return ""
-    
+
     for block in msg["content"]:
         if isinstance(block, dict) and block.get("type") == "text":
             text = block.get("text", "")
@@ -157,16 +157,16 @@ def _extract_assistant_summary_preview(msg: dict[str, Any] | None) -> str:
 
 def _collect_tool_uses(content: list[Any] | None) -> tuple[Counter[str], int]:
     """Count tool_use blocks in content list.
-    
+
     Args:
         content: List of content blocks (may contain text, tool_use, etc.)
-    
+
     Returns:
         Tuple of (Counter with tool name counts, total count)
     """
     if not content or not isinstance(content, list):
         return Counter(), 0
-    
+
     counter: Counter[str] = Counter()
     for block in content:
         if isinstance(block, dict) and block.get("type") == "tool_use":
@@ -188,7 +188,7 @@ def _build_session_info_dict(
     settings: dict[str, Any],
 ) -> dict[str, Any]:
     """Build the final 13-field session info dict.
-    
+
     Args:
         session_id: Full session ID
         title: Session title
@@ -200,7 +200,7 @@ def _build_session_info_dict(
         tool_calls: Counter of tool usage
         total_tool_calls: Total number of tool calls
         settings: Settings dict with token usage info
-    
+
     Returns:
         Dict with 13 fields: session_id, full_session_id, title, model,
         duration, duration_seconds, input_tokens, output_tokens, tool_calls,
@@ -211,14 +211,14 @@ def _build_session_info_dict(
     if start_time and end_time:
         duration_seconds = int((end_time - start_time).total_seconds())
     duration_str = _format_duration(duration_seconds)
-    
+
     # Token usage from settings (fallback chain)
     token_usage = settings.get("inclusiveTokenUsage", {})
     if not token_usage:
         token_usage = settings.get("tokenUsage", {})
     input_tokens = token_usage.get("inputTokens", 0)
     output_tokens = token_usage.get("outputTokens", 0)
-    
+
     return {
         "session_id": session_id[:8],
         "full_session_id": session_id,
