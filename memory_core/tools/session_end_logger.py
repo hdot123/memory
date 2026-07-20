@@ -462,10 +462,11 @@ def _resolve_jsonl_path(
     if not transcript_path and session_id and project_root_str:
         project_name = Path(project_root_str).name
         sessions_base = Path.home() / ".factory" / "sessions"
-        for d in sessions_base.iterdir():
-            if d.is_dir() and d.name.endswith(f"-{project_name}"):
-                transcript_path = str(d / f"{session_id}.jsonl")
-                break
+        if sessions_base.exists():
+            for d in sessions_base.iterdir():
+                if d.is_dir() and d.name.endswith(f"-{project_name}"):
+                    transcript_path = str(d / f"{session_id}.jsonl")
+                    break
 
     # Missing required params
     if not session_id or not project_root_str:
