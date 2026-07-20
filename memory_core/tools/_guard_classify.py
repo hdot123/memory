@@ -200,7 +200,7 @@ def _extract_ln_path(match: re.Match[str]) -> list[str]:
 
 def _extract_path_from_execute(command: str) -> list[str]:
     """Extract target paths from Execute command.
-    
+
     Dispatch table: 14 command patterns → path extraction handlers.
     """
     command = command.strip()
