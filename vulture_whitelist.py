@@ -1,6 +1,8 @@
-# Vulture whitelist - marks false positive unused code.
-# These items appear unused to static analysis but are actually referenced
-# via dynamic dispatch, protocols, TypedDict fields, or public API exports.
+# mypy: ignore-errors
+"""Vulture whitelist - marks false positive unused code.
+These items appear unused to static analysis but are actually referenced
+via dynamic dispatch, protocols, TypedDict fields, or public API exports.
+"""
 
 from memory_core.compat import check_compatibility, format_report
 from memory_core.ownership import DOMAIN, RESOURCE, OwnershipKind

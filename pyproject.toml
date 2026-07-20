@@ -82,7 +82,7 @@ python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
-exclude = ["workspace", "templates", "memory_core/workspace"]
+exclude = ["workspace", "templates", "memory_core/workspace", "vulture_whitelist.py"]
 
 [[tool.mypy.overrides]]
 module = "memory_core.tools.auto_capture"
