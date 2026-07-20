@@ -340,12 +340,12 @@ def _classify_agents_md(
     project_root: Path,
 ) -> dict[str, Any]:
     """Classify AGENTS.md modification (shared by Write/Edit and MultiEdit items).
-    
+
     Returns dict with keys: path, decision, reason, scenario.
     """
     full_path = project_root / file_path
     file_exists = full_path.exists()
-    
+
     if file_exists and content_before is None:
         return {
             "path": file_path,
@@ -353,7 +353,7 @@ def _classify_agents_md(
             "reason": "Cannot determine modification scope - full overwrite uncertain (AGENTS.md exists)",
             "scenario": 4,
         }
-    
+
     agents_result = classify_agents_md_block(file_path, content_before, content_after)
     return {
         "path": file_path,
@@ -369,7 +369,7 @@ def _classify_write_edit(
     """Handle Write and Edit tool classification."""
     tool_name = payload.get("tool_name", "")
     file_path = payload.get("file_path")
-    
+
     if not file_path:
         return RuleResult(
             matched=False,
@@ -377,12 +377,12 @@ def _classify_write_edit(
             message=f"{tool_name} without file_path",
             detail={"decision": "allow"}
         )
-    
+
     # Special handling for AGENTS.md (5b.4: diff-aware)
     if Path(file_path).name == "AGENTS.md":
         content_before = payload.get("content_before") or payload.get("old_str")
         content_after = payload.get("content_after") or payload.get("content") or payload.get("new_str")
-        
+
         agents_result = _classify_agents_md(file_path, content_before, content_after, project_root)
         decision = agents_result["decision"]
         return RuleResult(
@@ -394,7 +394,7 @@ def _classify_write_edit(
                 "scenario": agents_result.get("scenario"),
             }
         )
-    
+
     # 文件类型黑名单检查
     ft_block = _check_file_type_block(file_path)
     if ft_block is not None:
@@ -405,7 +405,7 @@ def _classify_write_edit(
             message=ft_block["reason"],
             detail={"decision": decision}
         )
-    
+
     result = classify_owned_path(file_path, ownership, project_root)
     if hasattr(result, "level"):
         return RuleResult(
@@ -434,10 +434,10 @@ def _classify_multiedit(
             message="MultiEdit with no file paths",
             detail={"decision": "allow"}
         )
-    
+
     item_results: list[dict[str, Any]] = []
     has_block = False
-    
+
     edits = payload.get("edits", [])
     for i, edit in enumerate(edits):
         if not isinstance(edit, dict):
@@ -445,18 +445,18 @@ def _classify_multiedit(
         path = edit.get("file_path", "")
         if not path:
             continue
-        
+
         # 5b.4: AGENTS.md diff-aware for MultiEdit items
         if Path(path).name == "AGENTS.md":
             content_before = edit.get("content_before") or edit.get("old_str")
             content_after = edit.get("content_after") or edit.get("new_str")
-            
+
             agents_result = _classify_agents_md(path, content_before, content_after, project_root)
             item_results.append(agents_result)
             if agents_result["decision"] == "block":
                 has_block = True
             continue
-        
+
         # 文件类型黑名单检查
         ft_block = _check_file_type_block(path)
         if ft_block is not None:
@@ -467,7 +467,7 @@ def _classify_multiedit(
             })
             has_block = True
             continue
-        
+
         # Normal path classification
         result = classify_owned_path(path, ownership, project_root)
         if hasattr(result, "level"):
@@ -483,7 +483,7 @@ def _classify_multiedit(
                 "decision": "allow",
                 "reason": result.reason,
             })
-    
+
     if has_block:
         blocked = [r for r in item_results if r["decision"] == "block"]
         blocked_paths = [r["path"] for r in blocked]
@@ -519,7 +519,7 @@ def _classify_notebook(
             message="NotebookEdit without notebook_path",
             detail={"decision": "allow"}
         )
-    
+
     result = classify_owned_path(notebook_path, ownership, project_root)
     if hasattr(result, "level"):
         return RuleResult(
@@ -548,9 +548,9 @@ def _classify_execute(
             message="Execute without command",
             detail={"decision": "allow"}
         )
-    
+
     paths = _extract_path_from_execute(command)
-    
+
     if paths:
         for path in paths:
             if _is_uncertain_path(path):
@@ -562,9 +562,9 @@ def _classify_execute(
                         detail={"decision": "block"}
                     )
                 continue
-            
+
             expanded = _expand_env_vars(path)
-            
+
             ft_block = _check_file_type_block(expanded)
             if ft_block is not None:
                 decision = ft_block["decision"]
@@ -574,11 +574,11 @@ def _classify_execute(
                     message=ft_block["reason"],
                     detail={"decision": decision}
                 )
-            
+
             check_path = expanded
             if not Path(expanded).is_absolute():
                 check_path = expanded
-            
+
             result = classify_owned_path(check_path, ownership, project_root)
             if hasattr(result, "level"):
                 return RuleResult(
@@ -614,15 +614,15 @@ def _classify_task(
 ) -> RuleResult:
     """Handle Task tool classification."""
     fixed_root = _get_project_root_for_task(project_root)
-    
+
     prompt = payload.get("prompt", "")
     policy_block = _build_ownership_policy_block(fixed_root)
-    
+
     if isinstance(prompt, str) and "<!-- ownership-policy-injection -->" in prompt:
         injected_prompt = prompt
     else:
         injected_prompt = f"{policy_block}\n\n{prompt}" if isinstance(prompt, str) else prompt
-    
+
     paths = _parse_task_paths(payload)
     if paths:
         for path in paths:
