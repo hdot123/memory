@@ -10,12 +10,8 @@ Covers the 5 key behaviors of main():
 from __future__ import annotations
 
 import json
-import os
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from memory_core.tools.session_end_logger import main
 
@@ -100,7 +96,7 @@ class TestMainPathResolution:
             with patch("memory_core.tools.session_end_logger.write_error_log") as mock_err:
                 mock_err.return_value = None
                 # write_error_log might be None, so patch it directly
-                with patch("memory_core.tools.session_end_logger.write_error_log", create=True) as mock_err2:
+                with patch("memory_core.tools.session_end_logger.write_error_log", create=True):
                     rc = main([])
 
         assert rc == 0
@@ -155,7 +151,7 @@ class TestMainErrorLogBranches:
             {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "Hello"}]}, "timestamp": "2025-01-01T00:01:00Z"},
             {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Hi there"}]}, "timestamp": "2025-01-01T00:02:00Z"},
         ]
-        jsonl.write_text("\n".join(json.dumps(l) for l in lines) + "\n")
+        jsonl.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
 
         stdin_payload = {
             "session_id": "test-session",
