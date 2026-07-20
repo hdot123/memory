@@ -969,7 +969,7 @@ def _check_server_ssh(
     checks = server.get("checks") or {}
     ssh_alias = server.get("ssh_alias")
     want_ssh = bool(checks.get("ssh")) and bool(ssh_alias)
-    
+
     ssh_ok: bool | None = None
     if want_ssh:
         ssh_ok = check_ssh_reachable(str(ssh_alias))
@@ -991,7 +991,7 @@ def _check_server_ssh(
             "checks.ssh=true 但缺少 ssh_alias 字段",
         )
         _append_violation(record, global_violations, v)
-    
+
     return ssh_ok
 
 
@@ -1006,7 +1006,7 @@ def _check_server_docker(
     ssh_alias = server.get("ssh_alias")
     checks = server.get("checks") or {}
     expected_containers = checks.get("docker_containers") or []
-    
+
     if expected_containers and ssh_ok:
         # 注意：_run_ssh 将 remote_cmd 用空格拼接发给远端 shell，
         # format 串含空格必须用单引号包裹，否则 shell 会拆成两个参数。
@@ -1066,7 +1066,7 @@ def _check_server_ports(
     """Check TCP port connectivity."""
     host = str(record["host"])
     checks = server.get("checks") or {}
-    
+
     for port in checks.get("ports") or []:
         port = int(port)
         ok = _tcp_connect_ok(host, port, timeout=3)
@@ -1088,7 +1088,7 @@ def _check_server_http_endpoints(
 ) -> None:
     """Check HTTP endpoint health via curl."""
     checks = server.get("checks") or {}
-    
+
     for ep in checks.get("http_endpoints") or []:
         if not isinstance(ep, dict):
             continue
