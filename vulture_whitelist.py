@@ -89,14 +89,11 @@ _require_env  # unused function (memory_core/tools/memory_hook_gateway.py:1119) 
 _canonicalize_cmux_refs  # unused function (memory_core/tools/memory_hook_gateway.py:1126) - normalization helper
 
 # Delegate implementations (registered dynamically)
-CodexDelegate  # unused class (memory_core/tools/memory_hook_impls.py:128) - registered delegate
-ClaudeDelegate  # unused class (memory_core/tools/memory_hook_impls.py:168) - registered delegate
 _.host_unavailable  # unused property (memory_core/tools/memory_hook_impls.py:286) - interface method
 _.host_unavailable  # unused property (memory_core/tools/memory_hook_impls.py:323) - interface method
 _.get_policy  # unused method (memory_core/tools/memory_hook_impls.py:452) - interface method
 _.resolve_kb_file  # unused method (memory_core/tools/memory_hook_impls.py:609) - interface method
 _.route  # unused method (memory_core/tools/memory_hook_impls.py:1019) - interface method
-PathUtilsImpl  # unused class (memory_core/tools/memory_hook_impls.py:1050) - registered implementation
 
 # Integrity verification helpers
 key_info  # unused function (memory_core/tools/memory_hook_integrity_keys.py:64) - public API
