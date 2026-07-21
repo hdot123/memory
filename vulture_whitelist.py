@@ -17,12 +17,6 @@ RESOURCE  # unused variable (memory_core/ownership.py:37) - public API
 # Dynamic module loading via __getattr__
 __getattr__  # unused function (memory_core/tools/__init__.py:14) - lazy imports
 
-# Error classes used for exception handling
-RuleViolationError  # unused class (memory_core/tools/_rule_errors.py:26) - public API
-OwnershipError  # unused class (memory_core/tools/_rule_errors.py:35) - public API
-GuardBlockError  # unused class (memory_core/tools/_rule_errors.py:39) - public API
-PolicyViolationError  # unused class (memory_core/tools/_rule_errors.py:49) - public API
-
 # Rule evaluator interface implementation
 RuleEvaluator  # unused class (memory_core/tools/_rule_types.py:55) - interface
 _.evaluate  # unused method (memory_core/tools/_rule_types.py:67) - interface method
@@ -33,7 +27,6 @@ capture_candidates  # unused function (memory_core/tools/auto_capture.py:20) - p
 
 # Business policy checker interface implementations
 _.evaluate  # unused method (memory_core/tools/business_policy_checks.py:116) - interface method
-LegalContractChecker  # unused class (memory_core/tools/business_policy_checks.py:237) - registered checker
 _.evaluate  # unused method (memory_core/tools/business_policy_checks.py:420) - interface method
 ScopeResolver  # unused class (memory_core/tools/business_policy_checks.py:677) - registered resolver
 
