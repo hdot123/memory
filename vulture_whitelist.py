@@ -23,7 +23,6 @@ _.evaluate  # unused method (memory_core/tools/_rule_types.py:67) - interface me
 
 # Entry points and public API
 plan_main  # unused function (memory_core/tools/audit_project_layout.py:1235) - entry point: memory-plan-residue
-capture_candidates  # unused function (memory_core/tools/auto_capture.py:20) - public API
 
 # Business policy checker interface implementations
 _.evaluate  # unused method (memory_core/tools/business_policy_checks.py:116) - interface method
@@ -125,9 +124,6 @@ check_prompt_or_raise  # unused function (memory_core/tools/prompt_validator.py:
 # Orchestrator implementation
 ResilientOrchestrator  # unused class (memory_core/tools/resilient_orchestrator.py:12) - registered orchestrator
 _.dispatch_task  # unused method (memory_core/tools/resilient_orchestrator.py:27) - interface method
-
-# Telemetry helpers
-_.safe_capture  # unused method (memory_core/tools/telemetry_bridge.py:201) - error handling wrapper
 
 # Validation helpers
 _parse_frontmatter  # unused function (memory_core/tools/validate_project_memory.py:71) - internal parser
