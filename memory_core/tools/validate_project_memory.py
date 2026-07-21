@@ -17,7 +17,6 @@ Exit codes:
     0 — all checks passed
     1 — one or more checks failed
 """
-from __future__ import annotations
 
 import argparse
 import importlib.metadata
@@ -28,9 +27,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 import tomllib
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants

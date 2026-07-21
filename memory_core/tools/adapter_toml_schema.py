@@ -1,6 +1,5 @@
 """Adapter TOML schema and loader for memory/system/adapter.toml configuration."""
 
-from __future__ import annotations
 
 import warnings as _warnings
 from dataclasses import dataclass, field

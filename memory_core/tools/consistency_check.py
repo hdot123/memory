@@ -5,7 +5,6 @@ Usage:
     python consistency_check.py
     python consistency_check.py --json
 """
-from __future__ import annotations
 
 import argparse
 import json

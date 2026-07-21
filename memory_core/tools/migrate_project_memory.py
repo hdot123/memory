@@ -21,7 +21,6 @@ Exit codes:
     1 — migration failed
     2 — usage error (bad args, missing files, etc.)
 """
-from __future__ import annotations
 
 import argparse
 import importlib.metadata
