@@ -16,10 +16,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
+import tomllib
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONSTANTS_PATH = REPO_ROOT / "memory_core" / "constants.py"

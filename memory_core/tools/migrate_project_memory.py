@@ -33,12 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from ._file_utils import exclusive_lock
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
+import tomllib
 
 from memory_core.constants import (
     _BACKUP_FAILED,
@@ -50,6 +45,8 @@ from memory_core.tools.adapter_toml_schema import (
     dump_adapter_toml,
     load_adapter_toml,
 )
+
+from ._file_utils import exclusive_lock
 
 # M6: Import ownership APIs for old project migration
 try:
