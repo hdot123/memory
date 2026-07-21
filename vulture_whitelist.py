@@ -89,7 +89,6 @@ _.route  # unused method (memory_core/tools/memory_hook_impls.py:1019) - interfa
 
 # Integrity verification helpers
 key_info  # unused function (memory_core/tools/memory_hook_integrity_keys.py:64) - public API
-_hmac_sha256  # unused function (memory_core/tools/memory_hook_integrity_manifest.py:130) - cryptographic helper
 quick_check  # unused function (memory_core/tools/memory_hook_integrity_verify.py:189) - public API
 
 # Interface data structures
@@ -105,25 +104,12 @@ _.get_policy  # unused method (memory_core/tools/memory_hook_interfaces.py:97) -
 is_v2  # unused function (memory_core/tools/memory_hook_schema.py:205) - public API
 is_lossless  # unused function (memory_core/tools/memory_hook_schema.py:362) - public API
 
-# Observability interface methods
-_.child_span  # unused method (memory_core/tools/observability.py:80) - interface method
-_.record_span  # unused method (memory_core/tools/observability.py:87) - interface method
-_.measure  # unused method (memory_core/tools/observability.py:150) - interface method
-MetricsRegistry  # unused class (memory_core/tools/observability.py:189) - registry class
-_.publish  # unused method (memory_core/tools/observability.py:215) - interface method
-ErrorTracker  # unused class (memory_core/tools/observability.py:252) - tracker class
-_.recent  # unused method (memory_core/tools/observability.py:283) - interface method
-
 # Project probe fields
 git_branch  # unused variable (memory_core/tools/project_probe.py:144) - data structure field
 _.git_branch  # unused attribute (memory_core/tools/project_probe.py:189) - data structure field
 
 # Prompt validation
 check_prompt_or_raise  # unused function (memory_core/tools/prompt_validator.py:59) - public API
-
-# Orchestrator implementation
-ResilientOrchestrator  # unused class (memory_core/tools/resilient_orchestrator.py:12) - registered orchestrator
-_.dispatch_task  # unused method (memory_core/tools/resilient_orchestrator.py:27) - interface method
 
 # Validation helpers
 _parse_frontmatter  # unused function (memory_core/tools/validate_project_memory.py:71) - internal parser

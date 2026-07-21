@@ -145,7 +145,7 @@ strict = true
 
 [tool.deptry]
 ignore = [
-    "tomllib",  # stdlib in Python 3.11+, conditional import with tomli fallback
+    "tomllib",  # stdlib in Python 3.14
     "yaml",
 ]
 exclude = [
