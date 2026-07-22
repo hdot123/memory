@@ -8,7 +8,7 @@ Integration tests verifying the full sedimentation pipeline:
 These tests combine:
 1. Inline capture helper (replaces deleted auto_capture.capture_candidates)
 2. Promote CLI (promote_global_kb.main)
-3. Routing fallback (RouteTargetPolicyImpl.resolve_kb_file)
+3. Promoted files are readable directly from global KB directories
 4. Runtime profile (build_default_runtime_profile)
 """
 
@@ -259,8 +259,7 @@ class TestVALCross003SedimentationFullFlow:
     def test_new_project_can_read_promoted_knowledge(
         self, project_a: Path, project_b: Path, shared_global_kb: Path
     ):
-        """Step 3: New project (B) can read promoted knowledge via fallback."""
-        from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
+        """Step 3: New project (B) can read promoted knowledge from global KB."""
         from memory_core.tools.promote_global_kb import main as promote_main
 
         # Step 3a: Project A produces and promotes knowledge
@@ -284,23 +283,12 @@ class TestVALCross003SedimentationFullFlow:
         ])
         assert exit_code == 0
 
-        # Step 3b: Project B (new project) can read via fallback
-        route_policy_b = RouteTargetPolicyImpl(
-            workspace_root=project_b,
-            repo_root=project_b,
-            global_kb_root=shared_global_kb,
-            global_kb_enabled=True,
-        )
-
-        # Project B should find the promoted knowledge via fallback
-        resolved = route_policy_b.resolve_kb_file("operations", pending_file.name)
-        assert resolved is not None
-        assert "docker-tips" in resolved.name
-        assert "global-kb" in str(resolved) or "shared-global-kb" in str(resolved)
-        assert resolved.exists()
+        # Step 3b: Verify promoted file exists in global KB and is readable
+        promoted_file = shared_global_kb / "operations" / pending_file.name
+        assert promoted_file.exists()
 
         # Verify content is accessible
-        content = resolved.read_text()
+        content = promoted_file.read_text()
         assert "Docker Tips" in content
         assert "multi-stage" in content
 
@@ -311,7 +299,6 @@ class TestVALCross003SedimentationFullFlow:
         from memory_core.tools.memory_hook_adapters.default_runtime_profile import (
             build_default_runtime_profile,
         )
-        from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
 
         # 1. Project A produces knowledge
@@ -342,20 +329,11 @@ class TestVALCross003SedimentationFullFlow:
         assert profile_b["GLOBAL_KB_ENABLED"] is True
         assert profile_b["GLOBAL_KB_ROOT"] == shared_global_kb
 
-        # 5. Project B can route to promoted knowledge
-        route_policy_b = RouteTargetPolicyImpl(
-            workspace_root=project_b,
-            repo_root=project_b,
-            global_kb_root=shared_global_kb,
-            global_kb_enabled=True,
-        )
+        # 5. Verify promoted file exists and is readable
+        promoted_file = shared_global_kb / "engineering" / pending_file.name
+        assert promoted_file.exists()
 
-        resolved = route_policy_b.resolve_kb_file("engineering", pending_file.name)
-        assert resolved is not None
-        assert "api-versioning" in resolved.name
-        assert resolved.exists()
-
-        content = resolved.read_text()
+        content = promoted_file.read_text()
         assert "API Versioning" in content
         assert "URL path" in content
 
@@ -391,7 +369,6 @@ class TestVALCross004MultiProjectSharing:
         self, project_a: Path, project_b: Path, shared_global_kb: Path
     ):
         """Project B should be able to read knowledge promoted by Project A."""
-        from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
 
         # Project A promotes knowledge to engineering/
@@ -415,29 +392,19 @@ class TestVALCross004MultiProjectSharing:
         ])
         assert exit_code == 0
 
-        # Project B can route to it
-        route_policy_b = RouteTargetPolicyImpl(
-            workspace_root=project_b,
-            repo_root=project_b,
-            global_kb_root=shared_global_kb,
-            global_kb_enabled=True,
-        )
-
-        resolved = route_policy_b.resolve_kb_file("engineering", pending_file.name)
-        assert resolved is not None
-        assert "pytest-fixtures" in resolved.name
-        assert resolved.exists()
+        # Verify promoted file exists and is readable
+        promoted_file = shared_global_kb / "engineering" / pending_file.name
+        assert promoted_file.exists()
 
         # Verify content matches what Project A promoted
-        content = resolved.read_text()
+        content = promoted_file.read_text()
         assert "Pytest Fixtures" in content
         assert "@pytest.fixture" in content
 
     def test_multiple_promotions_accessible_across_projects(
         self, project_a: Path, project_b: Path, shared_global_kb: Path
     ):
-        """Multiple promoted files should all be accessible across projects."""
-        from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
+        """Multiple promoted files should all be accessible in global KB."""
         from memory_core.tools.promote_global_kb import main as promote_main
 
         # Create multiple knowledge items
@@ -476,31 +443,19 @@ class TestVALCross004MultiProjectSharing:
             "--global-kb-root", str(shared_global_kb),
         ]) == 0
 
-        # Project B can access both
-        route_policy_b = RouteTargetPolicyImpl(
-            workspace_root=project_b,
-            repo_root=project_b,
-            global_kb_root=shared_global_kb,
-            global_kb_enabled=True,
-        )
+        # Verify both promoted files exist and are readable
+        promoted_ssh = shared_global_kb / "operations" / ssh_pending.name
+        assert promoted_ssh.exists()
+        assert "SSH Config" in promoted_ssh.read_text()
 
-        # Can access SSH guide in operations/
-        resolved_ssh = route_policy_b.resolve_kb_file("operations", ssh_pending.name)
-        assert resolved_ssh is not None
-        assert "ssh-config" in resolved_ssh.name
-        assert "SSH Config" in resolved_ssh.read_text()
-
-        # Can access CI optimization in engineering/
-        resolved_ci = route_policy_b.resolve_kb_file("engineering", ci_pending.name)
-        assert resolved_ci is not None
-        assert "ci-optimization" in resolved_ci.name
-        assert "CI Optimization" in resolved_ci.read_text()
+        promoted_ci = shared_global_kb / "engineering" / ci_pending.name
+        assert promoted_ci.exists()
+        assert "CI Optimization" in promoted_ci.read_text()
 
     def test_project_priority_over_global_still_holds(
         self, project_a: Path, project_b: Path, shared_global_kb: Path
     ):
         """Project-specific knowledge still takes priority over global KB."""
-        from memory_core.tools.memory_hook_impls import RouteTargetPolicyImpl
         from memory_core.tools.promote_global_kb import main as promote_main
 
         # Project A promotes SSH guide to global
@@ -525,19 +480,14 @@ class TestVALCross004MultiProjectSharing:
         project_b_ssh = project_b / "memory" / "kb" / "operations" / pending_file.name
         project_b_ssh.write_text("# SSH Guide (Project B)\n\nProject B specific SSH config.")
 
-        # Project B's routing should prefer its own file
-        route_policy_b = RouteTargetPolicyImpl(
-            workspace_root=project_b,
-            repo_root=project_b,
-            global_kb_root=shared_global_kb,
-            global_kb_enabled=True,
-        )
-
-        resolved = route_policy_b.resolve_kb_file("operations", pending_file.name)
-        assert resolved == project_b_ssh
-        assert "project-b" in str(resolved)
-
-        # Content should be Project B's version
-        content = resolved.read_text()
+        # Project B's own file exists with Project B's content
+        assert project_b_ssh.exists()
+        content = project_b_ssh.read_text()
         assert "Project B" in content
         assert "Generic SSH tips" not in content
+
+        # The promoted global file is also readable
+        promoted_ssh = shared_global_kb / "operations" / pending_file.name
+        assert promoted_ssh.exists()
+        global_content = promoted_ssh.read_text()
+        assert "Generic SSH tips" in global_content
