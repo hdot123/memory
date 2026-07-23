@@ -5,12 +5,15 @@ forwards payload to pretooluse_guard.py -> returns decision.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
-GATEWAY = Path(__file__).resolve().parents[1] / "memory_core" / "tools" / "memory_hook_gateway.py"
+# Repo root (parent of memory_core/); needed so subprocess can find the
+# memory_core.tools.memory_hook_gateway module regardless of cwd.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run_gateway(
@@ -31,10 +34,17 @@ def _run_gateway(
     if env_extra:
         env.update(env_extra)
 
-    full_env = {**__import__("os").environ, **env}
+    full_env = {**os.environ, **env}
+    # Ensure memory_core package is importable even when cwd is a tmp_path.
+    existing_pythonpath = full_env.get("PYTHONPATH", "")
+    full_env["PYTHONPATH"] = (
+        f"{_REPO_ROOT}{os.pathsep}{existing_pythonpath}"
+        if existing_pythonpath
+        else str(_REPO_ROOT)
+    )
 
     result = subprocess.run(
-        [sys.executable, str(GATEWAY), "--host", "factory", "--event", event, "--no-delegate"],
+        [sys.executable, "-m", "memory_core.tools.memory_hook_gateway", "--host", "factory", "--event", event, "--no-delegate"],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
